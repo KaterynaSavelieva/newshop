@@ -1,0 +1,32 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Virtual environments ---
+.venv/
+venv/
+
+# --- Environment variables ---
+.env
+
+# --- Logs & temp files ---
+logs/
+*.log
+*.tmp
+
+# --- IDE / system files ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Backups / export ---
+*.bak
+*.zip
+*.rar
+*.7z
+
+# --- Draw.io autosave ---
+*.bkp
