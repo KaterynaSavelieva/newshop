@@ -1,5 +1,5 @@
 # dashboard.py
-# Простий Flask-додаток для перегляду останніх продажів із бази newshopdb
+# 🌐 Простий Flask-додаток для перегляду останніх продажів із бази newshopdb
 
 from flask import Flask, render_template_string   # імпортуємо Flask і функцію для створення HTML зі змінними
 from db import get_conn                           # імпортуємо нашу функцію підключення до бази
@@ -11,12 +11,15 @@ def index():                                      # функція, яка ви�
     conn = get_conn()                             # підключення до бази даних
     with conn.cursor() as cur:                    # відкриваємо курсор для запитів
         cur.execute("""                           # SQL-запит вибирає останні 20 продажів
-            SELECT v.verkaufsdatum, a.produktname, va.verkaufsmenge, va.verkaufspreis
-            FROM verkauf v
-            JOIN verkaufartikel va ON v.verkaufID = va.verkaufID
-            JOIN artikel a ON va.artikelID = a.artikelID
-            ORDER BY v.verkaufsdatum DESC
-            LIMIT 20;
+            # SELECT v.verkaufsdatum, a.produktname, va.verkaufsmenge, va.verkaufspreis
+            # FROM verkauf v
+            # JOIN verkaufartikel va ON v.verkaufID = va.verkaufID
+            # JOIN artikel a ON va.artikelID = a.artikelID
+            # ORDER BY v.verkaufsdatum DESC
+            # LIMIT 20;
+            SELECT  a.artikelID,  a.produktname,  a.lagerbestand,  a.durchschnittskosten,  ROUND(a.lagerbestand * COALESCE(a.durchschnittskosten,0), 2) AS lagerwert
+            FROM artikel a
+            ORDER BY a.artikelID;
         """)
         rows = cur.fetchall()                     # отримуємо всі результати
     conn.close()                                  # закриваємо з'єднання
