@@ -1,83 +1,91 @@
-# purchase.py
-"""
-Створює ОДНУ закупку:
-- постачальник: випадковий
-- позицій у закупці: 1–8
-- товари: тільки ті, що прив'язані до постачальника (artikellieferant)
-- кількість на позицію: 10–100
-- ціна закупки: artikellieferant.einkaufspreis (без коливань)
-- дата закупки: NOW()
-Тригери на 'einkaufartikel' автоматично оновлять склад і середню собівартість.
-"""
+# 🔹 Якщо запас товару < 20 → робимо закупку у випадкового постачальника,
+#    який має прив'язку в artikellieferant.
+# 🔹 К-сть на позицію: випадково 30..80
+# 🔹 Якщо в одного постачальника кілька таких товарів — робимо ОДИН документ на постачальника.
+# 🔹 Дата закупки: NOW()
 
 import random
 from datetime import datetime
 from db import get_conn
 
-def pick_supplier(cur):
-    cur.execute("SELECT lieferantID FROM lieferanten ORDER BY RAND() LIMIT 1;")
-    row = cur.fetchone()
-    if not row:
-        raise RuntimeError("У таблиці 'lieferanten' немає даних.")
-    return row[0]
+def fetch_low_stock(cur):
+    # товари з запасом < 20
+    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 20;")
+    return cur.fetchall()  # [(artikelID, name, bestand), ...]
 
-def create_purchase_header(cur, lieferant_id, when=None):
-    when = when or datetime.now()
-    cur.execute(
-        "INSERT INTO einkauf(lieferantID, einkaufsdatum, rechnung, bemerkung) VALUES(%s,%s,%s,%s);",
-        (lieferant_id, when, f"INV-{random.randint(10000,99999)}", "Auto-Generated")
-    )
-    return cur.lastrowid, when
-
-def supplier_articles(cur, lieferant_id, limit_n):
-    # товари, які постачає цей постачальник, разом з їх ціною закупки
+def pick_random_supplier(cur, artikel_id):
+    # будь-який постачальник, що має цей товар у artikellieferant
     cur.execute("""
-        SELECT al.artikelID, al.einkaufspreis
-        FROM artikellieferant al
-        WHERE al.lieferantID = %s
+        SELECT lieferantID, einkaufspreis
+        FROM artikellieferant
+        WHERE artikelID = %s
         ORDER BY RAND()
-        LIMIT %s;
-    """, (lieferant_id, limit_n))
-    return cur.fetchall()  # [(artikelID, einkaufspreis), ...]
+        LIMIT 1;
+    """, (artikel_id,))
+    return cur.fetchone()  # (lieferantID, preis) або None
 
-def add_purchase_items(cur, einkauf_id, rows):
-    total_positions = 0
-    for artikel_id, ek_preis in rows:
-        menge = random.randint(10, 100)  # 10–100
-        cur.execute("""
-            INSERT INTO einkaufartikel(einkaufID, artikelID, einkaufsmenge, einkaufspreis)
-            VALUES (%s,%s,%s,%s);
-        """, (einkauf_id, artikel_id, menge, ek_preis))
-        total_positions += 1
-    return total_positions
+def create_header(cur, lieferant_id):
+    # створюємо заголовок закупки
+    cur.execute("""
+        INSERT INTO einkauf (lieferantID, einkaufsdatum, rechnung, bemerkung)
+        VALUES (%s, NOW(), %s, 'Auto-Generated (smart)')
+    """, (lieferant_id, f"INV-{random.randint(10000, 99999)}"))
+    return cur.lastrowid
+
+def add_item(cur, einkauf_id, artikel_id, menge, preis):
+    # додаємо позицію закупки
+    cur.execute("""
+        INSERT INTO einkaufartikel (einkaufID, artikelID, einkaufsmenge, einkaufspreis)
+        VALUES (%s, %s, %s, %s)
+    """, (einkauf_id, artikel_id, menge, preis))
 
 def main():
     conn = get_conn()
     if not conn:
         print("❌ Немає підключення до БД.")
         return
+
     try:
         with conn.cursor() as cur:
-            # 1) випадковий постачальник
-            lieferant_id = pick_supplier(cur)
+            low = fetch_low_stock(cur)
+            if not low:
+                print("ℹ️ Немає товарів з запасом < 20. Закупка не потрібна.")
+                return
 
-            # 2) заголовок закупки
-            einkauf_id, when = create_purchase_header(cur, lieferant_id)
+            # згрупуємо товари за постачальником: {lieferantID: [(artikelID, menge, preis), ...]}
+            plan = {}
+            skipped = []
 
-            # 3) оберемо 1–8 позицій із номенклатури постачальника
-            limit_n = random.randint(1, 8)
-            items = supplier_articles(cur, lieferant_id, limit_n)
-            if not items:
-                raise RuntimeError(f"У постачальника {lieferant_id} немає прив'язаних товарів у 'artikellieferant'.")
+            for artikel_id, name, bestand in low:
+                sup = pick_random_supplier(cur, artikel_id)
+                if not sup:
+                    skipped.append((artikel_id, name))
+                    continue
+                lieferant_id, preis = sup
+                menge = random.randint(30, 80)  # 1B: випадково 30..80
+                plan.setdefault(lieferant_id, []).append((artikel_id, menge, preis))
 
-            # 4) додамо позиції (тригери оновлять склад/собівартість)
-            added = add_purchase_items(cur, einkauf_id, items)
+            if not plan:
+                print("⚠️ Немає жодного доступного постачальника для потрібних товарів.")
+                return
+
+            created = []
+            for lieferant_id, items in plan.items():
+                einkauf_id = create_header(cur, lieferant_id)
+                for artikel_id, menge, preis in items:
+                    add_item(cur, einkauf_id, artikel_id, menge, preis)
+                created.append((einkauf_id, lieferant_id, len(items)))
 
         conn.commit()
-        print(f"✅ Закупка створена: einkaufID={einkauf_id}, постачальник={lieferant_id}, позицій={added}, дата={when}")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for eid, lid, n in created:
+            print(f"✅ [{now}] Закупка створена: einkaufID={eid}, постачальник={lid}, позицій={n}")
+        if skipped:
+            print("⚠️ Пропущені (нема прив'язки в artikellieferant):",
+                  ", ".join(f"{aid}" for aid, _ in skipped))
     except Exception as e:
         conn.rollback()
-        print(f"⚠️ Закупку скасовано. Причина: {e}")
+        print(f"❌ Помилка, транзакцію скасовано: {e}")
     finally:
         conn.close()
 
