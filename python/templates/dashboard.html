@@ -1,21 +1,34 @@
-{% extends "base.html" %}
-{% block content %}
 <h1>Verkaufsübersicht</h1>
 
 <table border="1" cellpadding="5">
-  <tr>
-    <th>Datum</th>
-    <th>Artikel</th>
-    <th>Menge</th>
-    <th>Preis (€)</th>
-  </tr>
-  {% for r in rows %}
-  <tr>
-    <td>{{ r[0] }}</td>
-    <td>{{ r[1] }}</td>
-    <td>{{ r[2] }}</td>
-    <td>{{ r[3] }}</td>
-  </tr>
-  {% endfor %}
+  <thead>
+    <tr>
+      <th>Datum</th>
+      <th>Kunde</th>
+      <th>Kundentyp</th>
+      <th>Artikel</th>
+      <th>Menge</th>
+      <th>VK-Preis (€)</th>   <!-- Verkaufspreis pro Einheit -->
+      <th>EK-Preis (€)</th>   <!-- Durchschnittskosten pro Einheit -->
+      <th>Umsatz (€)</th>     <!-- Menge * VK -->
+      <th>Kosten (€)</th>     <!-- Menge * EK -->
+      <th>Marge (€)</th>      <!-- Umsatz - Kosten -->
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r[0] }}</td>                 <!-- verkaufsdatum -->
+        <td>{{ r[1] }}</td>                 <!-- kunde -->
+        <td>{{ r[2] }}</td>                 <!-- kundentyp -->
+        <td>{{ r[3] }}</td>                 <!-- artikel -->
+        <td style="text-align:right">{{ r[4] }}</td>                 <!-- menge -->
+        <td style="text-align:right">{{ '%.2f'|format(r[5]) }}</td>  <!-- vk_preis -->
+        <td style="text-align:right">{{ '%.2f'|format(r[6]) }}</td>  <!-- ek_preis -->
+        <td style="text-align:right">{{ '%.2f'|format(r[7]) }}</td>  <!-- umsatz -->
+        <td style="text-align:right">{{ '%.2f'|format(r[8]) }}</td>  <!-- kosten -->
+        <td style="text-align:right">{{ '%.2f'|format(r[9]) }}</td>  <!-- marge -->
+      </tr>
+    {% endfor %}
+  </tbody>
 </table>
-{% endblock %}

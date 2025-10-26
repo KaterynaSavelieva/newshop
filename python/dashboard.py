@@ -1,5 +1,6 @@
 # python/dashboard.py
-# Дашборд (DE) + повний логін/логаут через Flask-Login
+# Dashboard (DE) + Login/Logout via Flask-Login
+# Показує: Kunde, Kundentyp, Artikel, Menge, VK-Preis, EK-Preis, Umsatz, Kosten, Marge
 
 import os
 from flask import Flask, render_template, redirect, url_for, request, flash
@@ -8,14 +9,14 @@ from flask_login import (
     login_required, current_user
 )
 from werkzeug.security import check_password_hash
-from .db import get_conn  # наша функція підключення до БД newshopdb
+from db import get_conn  # наша функція підключення до БД newshopdb
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev")  # секрет для сесій
 
 # ─ Flask-Login ─
 login_manager = LoginManager(app)
-login_manager.login_view = "login"   # куди редіректити, якщо не залогінений
+login_manager.login_view = "login"   # якщо не залогінена → редірект на /login
 
 # Модель-контейнер (не ORM). Дані беремо з БД.
 class User(UserMixin):
@@ -105,23 +106,51 @@ def logout():
 @login_required
 def index():
     rows = []
+    totals = {"umsatz": 0.0, "kosten": 0.0, "marge": 0.0}
+
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
+            # головний звіт: продажі + клієнт + тип клієнта + собівартість + маржа
             cur.execute(
                 """
-                SELECT v.verkaufsdatum, a.produktname, va.verkaufsmenge, va.verkaufspreis
+                SELECT
+                    v.verkaufsdatum,                                       -- 0 дата продажу
+                    CONCAT(k.vorname, ' ', k.nachname)   AS kunde,          -- 1 клієнт (ПІБ)
+                    kt.bezeichnung                      AS kundentyp,       -- 2 тип клієнта
+                    a.produktname                       AS artikel,         -- 3 товар
+                    va.verkaufsmenge                    AS menge,           -- 4 кількість
+                    va.verkaufspreis                    AS vk_preis,        -- 5 ціна продажу (за од.)
+                    COALESCE(a.durchschnittskosten,0)   AS ek_preis,        -- 6 собівартість (за од.)
+                    (va.verkaufsmenge * va.verkaufspreis)                         AS umsatz,  -- 7 виручка
+                    (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0))        AS kosten,  -- 8 витрати
+                    (va.verkaufsmenge * (va.verkaufspreis - COALESCE(a.durchschnittskosten,0))) AS marge  -- 9 маржа
                 FROM verkauf v
                 JOIN verkaufartikel va ON v.verkaufID = va.verkaufID
                 JOIN artikel a         ON a.artikelID = va.artikelID
+                JOIN kunden k          ON k.kundenID  = v.kundenID
+                JOIN kundentyp kt      ON kt.kundentypID = k.kundentypID
                 ORDER BY v.verkaufsdatum DESC
-                LIMIT 20;
+                LIMIT 100;
                 """
             )
             rows = cur.fetchall()
         conn.close()
 
-    return render_template("dashboard.html", rows=rows, title="Dashboard")
+        # підсумки по вибірці
+        if rows:
+            totals["umsatz"] = float(sum(r[7] for r in rows))
+            totals["kosten"] = float(sum(r[8] for r in rows))
+            totals["marge"]  = float(sum(r[9] for r in rows))
+
+    # у шаблон віддаємо rows (рядки таблиці) і totals (підсумки)
+    return render_template("dashboard.html", rows=rows, totals=totals, title="Dashboard")
+
+# Дружній маршрут /dashboard (на всяк випадок)
+@app.get("/dashboard")
+@login_required
+def dashboard_alias():
+    return redirect(url_for("index"))
 
 # ─ Health для швидкої перевірки ─
 @app.get("/health")
