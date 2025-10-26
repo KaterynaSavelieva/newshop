@@ -8,7 +8,7 @@ from flask_login import (
     login_required, current_user
 )
 from werkzeug.security import check_password_hash
-from db import get_conn  # наша функція підключення до БД newshopdb
+from .db import get_conn  # наша функція підключення до БД newshopdb
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev")  # секрет для сесій
