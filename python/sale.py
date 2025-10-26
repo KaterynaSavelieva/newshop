@@ -65,10 +65,10 @@ def add_sale_items(cur, verkauf_id, items, when, rabatt_pct):
     added = 0
     total = 0.0
     for artikel_id, stock in items:
-        # кількість 1–5, але не більше stock
+        # кількість 1–25, але не більше stock
         if stock <= 0:
             continue
-        menge = random.randint(1, 5)
+        menge = random.randint(1, 25)
         menge = min(menge, stock)
 
         # ціна одиниці = listenpreis
@@ -99,7 +99,7 @@ def main():
             verkauf_id, when = create_sale_header(cur, kunden_id)
 
             # 3) добираємо 1–5 товарів із наявним складом
-            max_items = random.randint(1, 5)
+            max_items = random.randint(1, 25)
             candidates = pick_articles_with_stock(cur, max_items=max_items)
 
             if not candidates:

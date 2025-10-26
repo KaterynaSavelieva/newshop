@@ -1,15 +1,19 @@
 # python/dashboard.py
 # Dashboard (DE) + Login/Logout via Flask-Login
 # Показує: Kunde, Kundentyp, Artikel, Menge, VK-Preis, EK-Preis, Umsatz, Kosten, Marge
+# Додає звіт /reports/daily (Umsatz pro Tag) з фільтром дат
 
 import os
+from datetime import date, timedelta
+
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user
 )
 from werkzeug.security import check_password_hash
-from db import get_conn  # наша функція підключення до БД newshopdb
+
+from .db import get_conn  # підключення до БД newshopdb
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev")  # секрет для сесій
@@ -101,36 +105,35 @@ def logout():
     flash("Abgemeldet.", "info")
     return redirect(url_for("login"))
 
-# ─ Дашборд ─
+# ─ Головний дашборд ─
 @app.get("/")
 @login_required
 def index():
+    """
+    Використовуємо VIEW v_sales, щоб отримати:
+    datum, kunde, kundentyp, artikel, menge, vk_preis, ek_preis, umsatz, kosten, marge
+    """
     rows = []
     totals = {"umsatz": 0.0, "kosten": 0.0, "marge": 0.0}
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            # головний звіт: продажі + клієнт + тип клієнта + собівартість + маржа
             cur.execute(
                 """
                 SELECT
-                    v.verkaufsdatum,                                       -- 0 дата продажу
-                    CONCAT(k.vorname, ' ', k.nachname)   AS kunde,          -- 1 клієнт (ПІБ)
-                    kt.bezeichnung                      AS kundentyp,       -- 2 тип клієнта
-                    a.produktname                       AS artikel,         -- 3 товар
-                    va.verkaufsmenge                    AS menge,           -- 4 кількість
-                    va.verkaufspreis                    AS vk_preis,        -- 5 ціна продажу (за од.)
-                    COALESCE(a.durchschnittskosten,0)   AS ek_preis,        -- 6 собівартість (за од.)
-                    (va.verkaufsmenge * va.verkaufspreis)                         AS umsatz,  -- 7 виручка
-                    (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0))        AS kosten,  -- 8 витрати
-                    (va.verkaufsmenge * (va.verkaufspreis - COALESCE(a.durchschnittskosten,0))) AS marge  -- 9 маржа
-                FROM verkauf v
-                JOIN verkaufartikel va ON v.verkaufID = va.verkaufID
-                JOIN artikel a         ON a.artikelID = va.artikelID
-                JOIN kunden k          ON k.kundenID  = v.kundenID
-                JOIN kundentyp kt      ON kt.kundentypID = k.kundentypID
-                ORDER BY v.verkaufsdatum DESC
+                    verkaufsdatum,   -- 0
+                    kunde,           -- 1
+                    kundentyp,       -- 2
+                    artikel,         -- 3
+                    menge,           -- 4
+                    vk_preis,        -- 5
+                    ek_preis,        -- 6
+                    umsatz,          -- 7  (нетто, після знижки)
+                    kosten,          -- 8
+                    marge            -- 9
+                FROM v_sales
+                ORDER BY verkaufsdatum DESC
                 LIMIT 100;
                 """
             )
@@ -151,6 +154,56 @@ def index():
 @login_required
 def dashboard_alias():
     return redirect(url_for("index"))
+
+# ─ Звіт: продажі по днях ─
+@app.get("/reports/daily")
+@login_required
+def report_daily():
+    """
+    Читає агреговані дані з v_sales_by_day у діапазоні дат [von..bis].
+    Якщо параметри не задані — останні 30 днів.
+    """
+    bis = request.args.get("bis") or date.today().isoformat()
+    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+
+    rows = []
+    conn = get_conn()
+    if conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  tag, positionen, menge, rabatt_eur, umsatz, kosten, marge,
+                  umsatz_brutto, marge_brutto, marge_prozent, marge_brutto_prozent
+                FROM v_sales_by_day
+                WHERE tag BETWEEN %s AND %s
+                ORDER BY tag
+                """,
+                (von, bis)
+            )
+            rows = cur.fetchall()
+        conn.close()
+
+    # підсумки (для футера таблиці)
+    totals = {
+        "positionen": sum(r[1] for r in rows) if rows else 0,
+        "menge":      float(sum(r[2] for r in rows)) if rows else 0.0,
+        "rabatt_eur": float(sum(r[3] for r in rows)) if rows else 0.0,
+        "umsatz":     float(sum(r[4] for r in rows)) if rows else 0.0,
+        "kosten":     float(sum(r[5] for r in rows)) if rows else 0.0,
+        "marge":      float(sum(r[6] for r in rows)) if rows else 0.0,
+        "umsatz_br":  float(sum(r[7] for r in rows)) if rows else 0.0,
+        "marge_br":   float(sum(r[8] for r in rows)) if rows else 0.0,
+    }
+
+    return render_template(
+        "reports_daily.html",
+        title="Umsatz pro Tag",
+        rows=rows,
+        totals=totals,
+        von=von,
+        bis=bis
+    )
 
 # ─ Health для швидкої перевірки ─
 @app.get("/health")
