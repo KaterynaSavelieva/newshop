@@ -14,8 +14,13 @@
 <body>
 
 <nav>
-  <!-- 🔹 Просте меню без логіну -->
-  <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+  {% if current_user.is_authenticated %}
+    Hallo, {{ current_user.name }}!
+    <a href="{{ url_for('index') }}">Dashboard</a>
+    <a href="{{ url_for('logout') }}">Abmelden</a>
+  {% else %}
+    <a href="{{ url_for('login') }}">Anmelden</a>
+  {% endif %}
 </nav>
 
 <hr>

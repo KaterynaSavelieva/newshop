@@ -1,9 +1,8 @@
 {% extends "base.html" %}
-
 {% block content %}
 <h1>Verkaufsübersicht</h1>
 
-<table>
+<table border="1" cellpadding="5">
   <tr>
     <th>Datum</th>
     <th>Artikel</th>
@@ -11,14 +10,12 @@
     <th>Preis (€)</th>
   </tr>
   {% for r in rows %}
-    <tr>
-      <td>{{ r[0] }}</td>
-      <td>{{ r[1] }}</td>
-      <td>{{ r[2] }}</td>
-      <td>{{ "%.2f"|format(r[3]) }}</td>
-    </tr>
+  <tr>
+    <td>{{ r[0] }}</td>
+    <td>{{ r[1] }}</td>
+    <td>{{ r[2] }}</td>
+    <td>{{ r[3] }}</td>
+  </tr>
   {% endfor %}
 </table>
-
-<p>🕒 Angezeigt: die letzten 20 Verkäufe</p>
 {% endblock %}
