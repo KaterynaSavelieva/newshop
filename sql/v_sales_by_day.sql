@@ -1,4 +1,5 @@
 USE newshopdb;
+
 CREATE OR REPLACE VIEW v_sales_by_day AS
 SELECT
   DATE(verkaufsdatum)                           AS tag,               -- день
