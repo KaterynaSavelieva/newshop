@@ -1,116 +1,46 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h1>Umsatz pro Tag</h1>
+<h1>{{ title }}</h1>
 
-<!-- ▲ Невеликий лінійний графік Umsatz (€) за вибраний період -->
-<section style="margin: 18px 0;">
-  <h2 style="margin: 0 0 8px 0; font-size: 18px;">Umsatz – Diagramm (€/Tag)</h2>
-
-  <!-- Рамка під графік -->
-  <div style="border:1px solid #bbb; border-radius:10px; padding:10px; background:#fff;">
-    <!-- SVG-полотно; viewBox фіксований, тож масштаб працює автоматично -->
-    <svg id="umsatzChart" viewBox="0 0 600 220" width="100%" height="220"
-         preserveAspectRatio="none" style="display:block;">
-      <!-- осі (низова лінія + ліва “нульова”) -->
-      <line x1="40" y1="200" x2="590" y2="200" stroke="#ccc"/>
-      <line x1="40" y1="10"  x2="40"  y2="200" stroke="#eee"/>
-      <!-- підпис максимуму зліва (допомагає читати масштаб) -->
-      <text id="maxLabel" x="44" y="20" fill="#666" font-size="11"></text>
-      <!-- сама лінія графіка; заповнимо з JS -->
-      <path id="umsatzPath" d="" fill="none" stroke="#2b7cff" stroke-width="2"/>
-      <!-- точки для наведення -->
-      <g id="dots"></g>
-    </svg>
-
-    <!-- підписи по осі X (дати) -->
-    <div id="xTicks" style="display:flex; gap:8px; margin:6px 0 0 40px; flex-wrap:wrap; font-size:11px; color:#666;"></div>
-  </div>
-</section>
-
-<script>
-  // 1) Дістаємо з Jinja дані: дати й Umsatz (€)
-  // rows: [tag, positionen, menge, rabatt_eur, umsatz, kosten, marge, umsatz_brutto, ...]
-  const dates  = {{ rows|map(attribute=0)|list|tojson }};   // список дат-рядків 'YYYY-MM-DD'
-  const values = {{ rows|map(attribute=4)|list|tojson }};   // Umsatz (€) по днях
-
-  // 2) Налаштування “полотна”
-  const svgW = 600, svgH = 220;    // розмір viewBox
-  const leftPad = 40, rightPad = 10, topPad = 10, bottomPad = 20;
-  const innerW = svgW - leftPad - rightPad;   // робоча ширина
-  const innerH = svgH - topPad - bottomPad;   // робоча висота
-
-  // 3) Межі й нормалізація значень
-  const maxVal = Math.max(1, ...values);      // захист від max=0
-  const n = values.length;
-  const stepX = n > 1 ? innerW / (n - 1) : 0; // крок між точками по X
-
-  // 4) Будуємо path-лінію
-  let d = "";
-  const points = []; // збережемо розраховані точки для крапок-навідників
-  for (let i = 0; i < n; i++) {
-    // X: рівномірно по ширині; Y: зверху вниз, тому віднімаємо від висоти
-    const x = leftPad + stepX * i;
-    const y = topPad + innerH * (1 - (values[i] / maxVal));
-    points.push([x, y]);
-    d += (i === 0 ? "M" : "L") + x + " " + y + " ";
-  }
-
-  // 5) Рендеримо path і підписи
-  document.getElementById("umsatzPath").setAttribute("d", d.trim());
-  document.getElementById("maxLabel").textContent = `max ≈ € ${maxVal.toFixed(2)}`;
-
-  // 6) Малюємо невеликі точки та підказки
-  const dotsG = document.getElementById("dots");
-  points.forEach((p, i) => {
-    const [x, y] = p;
-    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", x);
-    c.setAttribute("cy", y);
-    c.setAttribute("r", 3);
-    c.setAttribute("fill", "#2b7cff");
-    c.style.cursor = "pointer";
-    c.addEventListener("mouseenter", () => {
-      c.setAttribute("r", 5);
-      c.setAttribute("fill", "#ff7f2b");
-      // простий tooltip через title
-      c.setAttribute("title", `${dates[i]} • € ${values[i].toFixed(2)}`);
-    });
-    c.addEventListener("mouseleave", () => {
-      c.setAttribute("r", 3);
-      c.setAttribute("fill", "#2b7cff");
-    });
-    dotsG.appendChild(c);
-  });
-
-  // 7) Розумні підписи дат (щоб не захаращувати: 6 шт. максимум)
-  const xTicks = document.getElementById("xTicks");
-  const tickCount = Math.min(6, dates.length);
-  if (tickCount > 0) {
-    for (let i = 0; i < tickCount; i++) {
-      const idx = Math.round(i * (dates.length - 1) / (tickCount - 1));
-      const span = document.createElement("span");
-      span.textContent = dates[idx];
-      xTicks.appendChild(span);
-    }
-  }
-</script>
-
-
-<!-- Фільтр за датою (GET, щоб посилання можна було ділитися) -->
-<form method="get" style="margin-bottom:12px">
+<!-- 🔹 Фільтр дат -->
+<form method="get" style="margin-bottom: 1em;">
   <label>Von:
     <input type="date" name="von" value="{{ von }}">
   </label>
-  <label style="margin-left:8px">Bis:
+  <label>Bis:
     <input type="date" name="bis" value="{{ bis }}">
   </label>
-  <button type="submit" style="margin-left:8px">Filtern</button>
-  <a href="{{ url_for('report_daily') }}" style="margin-left:8px">Zurücksetzen</a>
+  <button type="submit">Filtern</button>
+  <a href="{{ url_for('report_daily') }}">Zurücksetzen</a>
 </form>
 
-<table border="1" cellpadding="6">
-  <thead>
+<!-- 🔹 Графік Umsatz -->
+<section style="margin:18px 0;">
+  <h2 style="margin:0 0 8px 0; font-size:18px;">Umsatz – Diagramm (€/Tag)</h2>
+
+  <div style="border:1px solid #d8d8d8; border-radius:12px; padding:10px; background:#fff;">
+    <svg id="umsatzChart" viewBox="0 0 640 260" width="100%" height="260" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stop-color="#2b7cff" stop-opacity="0.20"/>
+          <stop offset="100%" stop-color="#2b7cff" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <g id="grid"></g>
+      <text id="maxLabel" x="46" y="14" fill="#6b7280" font-size="11"></text>
+      <path id="areaPath" d="" fill="url(#areaFill)" stroke="none"></path>
+      <path id="linePath" d="" fill="none" stroke="#2b7cff" stroke-width="2.2"></path>
+      <g id="dots"></g>
+    </svg>
+
+    <div id="xTicks" style="display:flex; gap:10px; margin:6px 0 0 46px; flex-wrap:wrap; font-size:11px; color:#6b7280;"></div>
+  </div>
+</section>
+
+<!-- 🔹 Таблиця продажів по днях -->
+<table border="1" cellspacing="0" cellpadding="4" style="border-collapse: collapse; width:100%; font-size:14px;">
+  <thead style="background:#f4f4f4;">
     <tr>
       <th>Tag</th>
       <th>Positionen</th>
@@ -129,34 +59,123 @@
     {% for r in rows %}
     <tr>
       <td>{{ r[0] }}</td>
-      <td style="text-align:right">{{ r[1] }}</td>
-      <td style="text-align:right">{{ r[2] }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[3]) }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[4]) }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[5]) }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[6]) }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[7]) }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[8]) }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[9]) }}</td>
-      <td style="text-align:right">{{ '%.2f'|format(r[10]) }}</td>
+      <td style="text-align:right;">{{ r[1] }}</td>
+      <td style="text-align:right;">{{ r[2] }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[3]) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[4]) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[5]) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[6]) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[7]) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[8]) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[9]) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(r[10]) }}</td>
     </tr>
     {% endfor %}
   </tbody>
-  <tfoot>
+  <tfoot style="background:#fafafa; font-weight:bold;">
     <tr>
-      <th>Summe</th>
-      <th style="text-align:right">{{ totals.positionen }}</th>
-      <th style="text-align:right">{{ '%.0f'|format(totals.menge) }}</th>
-      <th style="text-align:right">{{ '%.2f'|format(totals.rabatt_eur) }}</th>
-      <th style="text-align:right">{{ '%.2f'|format(totals.umsatz) }}</th>
-      <th style="text-align:right">{{ '%.2f'|format(totals.kosten) }}</th>
-      <th style="text-align:right">{{ '%.2f'|format(totals.marge) }}</th>
-      <th style="text-align:right">{{ '%.2f'|format(totals.umsatz_br) }}</th>
-      <th style="text-align:right">{{ '%.2f'|format(totals.marge_br) }}</th>
-      <th></th>
-      <th></th>
+      <td>Summe</td>
+      <td style="text-align:right;">{{ rows|sum(attribute=1) }}</td>
+      <td style="text-align:right;">{{ rows|sum(attribute=2) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=3)) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=4)) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=5)) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=6)) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=7)) }}</td>
+      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=8)) }}</td>
+      <td colspan="2"></td>
     </tr>
   </tfoot>
 </table>
+
+<!-- 🔹 Графік JS -->
+<script>
+  const datesRaw = {{ rows|map(attribute=0)|list|tojson }};
+  const values   = {{ rows|map(attribute=4)|list|tojson }};
+  const fmtDate = s => {
+    const d = new Date(s);
+    if (!isNaN(d)) {
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      return `${dd}.${mm}`;
+    }
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    return m ? `${m[3]}.${m[2]}` : s;
+  };
+  const W=640,H=260,L=46,R=10,T=20,B=26;
+  const innerW=W-L-R,innerH=H-T-B;
+  const maxValRaw=Math.max(1,...values);
+  const pow=Math.pow(10,Math.max(0,String(Math.floor(maxValRaw)).length-1));
+  const yMax=Math.ceil(maxValRaw/pow)*pow;
+  document.getElementById('maxLabel').textContent=`max ≈ € ${yMax.toFixed(0)}`;
+  const n=values.length;
+  const stepX=n>1?innerW/(n-1):0;
+  const quadPath=pts=>{
+    if(pts.length===0)return'';
+    if(pts.length===1)return`M ${pts[0][0]} ${pts[0][1]}`;
+    let d=`M ${pts[0][0]} ${pts[0][1]}`;
+    for(let i=1;i<pts.length;i++){
+      const[x0,y0]=pts[i-1];const[x1,y1]=pts[i];
+      const cx=(x0+x1)/2,cy=(y0+y1)/2;
+      d+=` Q ${x0} ${y0}, ${cx} ${cy}`;
+    }
+    const[xe,ye]=pts[pts.length-1];d+=` T ${xe} ${ye}`;return d;
+  };
+  const pts=values.map((v,i)=>{
+    const x=L+stepX*i;
+    const y=T+innerH*(1-(v/yMax));
+    return[x,y];
+  });
+  const grid=document.getElementById('grid');
+  const gridLines=5;
+  for(let i=0;i<=gridLines;i++){
+    const y=T+innerH*(i/gridLines);
+    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',L);ln.setAttribute('x2',W-R);
+    ln.setAttribute('y1',y);ln.setAttribute('y2',y);
+    ln.setAttribute('stroke',i===gridLines?'#d1d5db':'#eee');
+    grid.appendChild(ln);
+    if(i<gridLines){
+      const val=((gridLines-i)/gridLines)*yMax;
+      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x',4);txt.setAttribute('y',y+4);
+      txt.setAttribute('fill','#9ca3af');
+      txt.setAttribute('font-size','10');
+      txt.textContent=val.toFixed(0);
+      grid.appendChild(txt);
+    }
+  }
+  const lineD=quadPath(pts);
+  document.getElementById('linePath').setAttribute('d',lineD);
+  if(pts.length>1){
+    const areaD=lineD+` L ${pts[pts.length-1][0]} ${T+innerH} L ${pts[0][0]} ${T+innerH} Z`;
+    document.getElementById('areaPath').setAttribute('d',areaD);
+  }
+  const dotsG=document.getElementById('dots');
+  const dates=datesRaw.map(fmtDate);
+  pts.forEach((p,i)=>{
+    const[x,y]=p;
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x);
+    c.setAttribute('cy',y);
+    c.setAttribute('r',3.2);
+    c.setAttribute('fill','#2b7cff');
+    c.style.cursor='pointer';
+    const t=document.createElementNS('http://www.w3.org/2000/svg','title');
+    t.textContent=`${dates[i]} • € ${(+values[i]).toFixed(2)}`;
+    c.appendChild(t);
+    c.addEventListener('mouseenter',()=>{c.setAttribute('r',5);c.setAttribute('fill','#ff7f2b');});
+    c.addEventListener('mouseleave',()=>{c.setAttribute('r',3.2);c.setAttribute('fill','#2b7cff');});
+    dotsG.appendChild(c);
+  });
+  const xTicks=document.getElementById('xTicks');
+  const ticks=Math.min(8,dates.length);
+  for(let i=0;i<ticks;i++){
+    const idx=Math.round(i*(dates.length-1)/(ticks-1));
+    const span=document.createElement('span');
+    span.textContent=dates[idx];
+    xTicks.appendChild(span);
+  }
+</script>
 
 {% endblock %}
