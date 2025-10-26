@@ -1,27 +1,24 @@
-{% extends "base.html" %}  <!-- наслідуємо базовий шаблон -->
+{% extends "base.html" %}
 
 {% block content %}
-<h1>Verkauf Übersicht</h1>
+<h1>Verkaufsübersicht</h1>
 
 <table>
-  <thead>
+  <tr>
+    <th>Datum</th>
+    <th>Artikel</th>
+    <th>Menge</th>
+    <th>Preis (€)</th>
+  </tr>
+  {% for r in rows %}
     <tr>
-      <th>Дата</th>
-      <th>Артикль</th>
-      <th>Кількість</th>
-      <th>Ціна</th>
+      <td>{{ r[0] }}</td>
+      <td>{{ r[1] }}</td>
+      <td>{{ r[2] }}</td>
+      <td>{{ "%.2f"|format(r[3]) }}</td>
     </tr>
-  </thead>
-  <tbody>
-    {% for r in rows %}
-      <!-- r[0]..r[3] — колонки з SELECT; підпишемо для наочності -->
-      <tr>
-        <td>{{ r[0] }}</td>  <!-- verkaufsdatum -->
-        <td>{{ r[1] }}</td>  <!-- produktname -->
-        <td>{{ r[2] }}</td>  <!-- verkaufsmenge -->
-        <td>{{ r[3] }}</td>  <!-- verkaufspreis -->
-      </tr>
-    {% endfor %}
-  </tbody>
+  {% endfor %}
 </table>
+
+<p>🕒 Angezeigt: die letzten 20 Verkäufe</p>
 {% endblock %}

@@ -1,11 +1,10 @@
-from flask import Flask, render_template_string, render_template   # додаємо render_template
+from flask import Flask, render_template
 from db import get_conn
 
 app = Flask(__name__)
 
 @app.route("/")
-def index():
-    # підключення до БД
+def dashboard():
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("""
@@ -14,13 +13,15 @@ def index():
             JOIN verkaufartikel va ON v.verkaufID = va.verkaufID
             JOIN artikel a ON va.artikelID = a.artikelID
             ORDER BY v.verkaufsdatum DESC
-            LIMIT 20;
+            LIMIT 20
         """)
         rows = cur.fetchall()
     conn.close()
 
-    # віддаємо HTML-шаблон (templates/dashboard.html)
-    return render_template("dashboard.html", rows=rows, title="Дашборд")
+    return render_template("dashboard.html", rows=rows, title="Verkaufsübersicht")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
 
 # ▶️ Запускаємо Flask-сервер (доступний для всіх у локальній мережі)
 if __name__ == "__main__":
