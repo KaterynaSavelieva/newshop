@@ -1,0 +1,41 @@
+<!-- базова "рамка" для всіх сторінок -->
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title or "NewShop" }}</title>  <!-- заголовок, якщо не передали — "NewShop" -->
+  <style>
+    body { font-family: sans-serif; margin: 24px; }   /* прості стилі, щоб було охайно */
+    nav  { margin-bottom: 16px; }                     /* відступ під меню */
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #888; padding: 4px 8px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  {% if current_user.is_authenticated %}
+    Привіт, {{ current_user.name }}!
+    <a href="{{ url_for('dashboard') }}">Дашборд</a> |
+    <a href="{{ url_for('logout') }}">Вийти</a>
+  {% else %}
+    <a href="{{ url_for('login') }}">Увійти</a>
+  {% endif %}
+</nav>
+
+<!-- повідомлення (flash) -->
+{% with msgs = get_flashed_messages() %}
+  {% if msgs %}
+    <ul>
+      {% for m in msgs %}
+        <li>{{ m }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+<!-- сюди підставлятиметься вміст конкретної сторінки -->
+{% block content %}{% endblock %}
+
+</body>
+</html>

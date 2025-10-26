@@ -1,0 +1,27 @@
+{% extends "base.html" %}  <!-- наслідуємо базовий шаблон -->
+
+{% block content %}
+<h1>Verkauf Übersicht</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Дата</th>
+      <th>Артикль</th>
+      <th>Кількість</th>
+      <th>Ціна</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+      <!-- r[0]..r[3] — колонки з SELECT; підпишемо для наочності -->
+      <tr>
+        <td>{{ r[0] }}</td>  <!-- verkaufsdatum -->
+        <td>{{ r[1] }}</td>  <!-- produktname -->
+        <td>{{ r[2] }}</td>  <!-- verkaufsmenge -->
+        <td>{{ r[3] }}</td>  <!-- verkaufspreis -->
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
