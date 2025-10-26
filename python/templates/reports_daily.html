@@ -3,6 +3,100 @@
 
 <h1>Umsatz pro Tag</h1>
 
+<!-- ▲ Невеликий лінійний графік Umsatz (€) за вибраний період -->
+<section style="margin: 18px 0;">
+  <h2 style="margin: 0 0 8px 0; font-size: 18px;">Umsatz – Diagramm (€/Tag)</h2>
+
+  <!-- Рамка під графік -->
+  <div style="border:1px solid #bbb; border-radius:10px; padding:10px; background:#fff;">
+    <!-- SVG-полотно; viewBox фіксований, тож масштаб працює автоматично -->
+    <svg id="umsatzChart" viewBox="0 0 600 220" width="100%" height="220"
+         preserveAspectRatio="none" style="display:block;">
+      <!-- осі (низова лінія + ліва “нульова”) -->
+      <line x1="40" y1="200" x2="590" y2="200" stroke="#ccc"/>
+      <line x1="40" y1="10"  x2="40"  y2="200" stroke="#eee"/>
+      <!-- підпис максимуму зліва (допомагає читати масштаб) -->
+      <text id="maxLabel" x="44" y="20" fill="#666" font-size="11"></text>
+      <!-- сама лінія графіка; заповнимо з JS -->
+      <path id="umsatzPath" d="" fill="none" stroke="#2b7cff" stroke-width="2"/>
+      <!-- точки для наведення -->
+      <g id="dots"></g>
+    </svg>
+
+    <!-- підписи по осі X (дати) -->
+    <div id="xTicks" style="display:flex; gap:8px; margin:6px 0 0 40px; flex-wrap:wrap; font-size:11px; color:#666;"></div>
+  </div>
+</section>
+
+<script>
+  // 1) Дістаємо з Jinja дані: дати й Umsatz (€)
+  // rows: [tag, positionen, menge, rabatt_eur, umsatz, kosten, marge, umsatz_brutto, ...]
+  const dates  = {{ rows|map(attribute=0)|list|tojson }};   // список дат-рядків 'YYYY-MM-DD'
+  const values = {{ rows|map(attribute=4)|list|tojson }};   // Umsatz (€) по днях
+
+  // 2) Налаштування “полотна”
+  const svgW = 600, svgH = 220;    // розмір viewBox
+  const leftPad = 40, rightPad = 10, topPad = 10, bottomPad = 20;
+  const innerW = svgW - leftPad - rightPad;   // робоча ширина
+  const innerH = svgH - topPad - bottomPad;   // робоча висота
+
+  // 3) Межі й нормалізація значень
+  const maxVal = Math.max(1, ...values);      // захист від max=0
+  const n = values.length;
+  const stepX = n > 1 ? innerW / (n - 1) : 0; // крок між точками по X
+
+  // 4) Будуємо path-лінію
+  let d = "";
+  const points = []; // збережемо розраховані точки для крапок-навідників
+  for (let i = 0; i < n; i++) {
+    // X: рівномірно по ширині; Y: зверху вниз, тому віднімаємо від висоти
+    const x = leftPad + stepX * i;
+    const y = topPad + innerH * (1 - (values[i] / maxVal));
+    points.push([x, y]);
+    d += (i === 0 ? "M" : "L") + x + " " + y + " ";
+  }
+
+  // 5) Рендеримо path і підписи
+  document.getElementById("umsatzPath").setAttribute("d", d.trim());
+  document.getElementById("maxLabel").textContent = `max ≈ € ${maxVal.toFixed(2)}`;
+
+  // 6) Малюємо невеликі точки та підказки
+  const dotsG = document.getElementById("dots");
+  points.forEach((p, i) => {
+    const [x, y] = p;
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", x);
+    c.setAttribute("cy", y);
+    c.setAttribute("r", 3);
+    c.setAttribute("fill", "#2b7cff");
+    c.style.cursor = "pointer";
+    c.addEventListener("mouseenter", () => {
+      c.setAttribute("r", 5);
+      c.setAttribute("fill", "#ff7f2b");
+      // простий tooltip через title
+      c.setAttribute("title", `${dates[i]} • € ${values[i].toFixed(2)}`);
+    });
+    c.addEventListener("mouseleave", () => {
+      c.setAttribute("r", 3);
+      c.setAttribute("fill", "#2b7cff");
+    });
+    dotsG.appendChild(c);
+  });
+
+  // 7) Розумні підписи дат (щоб не захаращувати: 6 шт. максимум)
+  const xTicks = document.getElementById("xTicks");
+  const tickCount = Math.min(6, dates.length);
+  if (tickCount > 0) {
+    for (let i = 0; i < tickCount; i++) {
+      const idx = Math.round(i * (dates.length - 1) / (tickCount - 1));
+      const span = document.createElement("span");
+      span.textContent = dates[idx];
+      xTicks.appendChild(span);
+    }
+  }
+</script>
+
+
 <!-- Фільтр за датою (GET, щоб посилання можна було ділитися) -->
 <form method="get" style="margin-bottom:12px">
   <label>Von:
