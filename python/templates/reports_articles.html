@@ -146,13 +146,15 @@
 <script>
 const labels={{ rows|map(attribute=1)|list|tojson }};
 const umsatz={{ rows|map(attribute=4)|list|tojson }};
-const marge={{ rows|map(attribute=7)|list|tojson }};
+    const marge€ = {{ rows|map(attribute = 6) | list | tojson }};
+const marge = {{ rows| map(attribute = 7) | list | tojson }};
 
 new Chart(document.getElementById('artChart'),{
   type:'bar',
   data:{labels,datasets:[
-    {type:'bar',label:'Umsatz (€)',data:umsatz,yAxisID:'yEur',borderWidth:1},
-    {type:'line',label:'Marge (%)',data:marge,yAxisID:'yPct',borderWidth:2,fill:false,tension:.25,pointRadius:2}
+      { type: 'bar', label: 'Umsatz (€)', data: umsatz, yAxisID: 'yEur', borderWidth: 1 },
+      { type: 'bar', label: 'Marge (€)', data: marge€, yAxisID: 'yEur', borderWidth: 1},
+      { type: 'line', label: 'Marge (%)', data: marge, yAxisID: 'yPct', borderWidth: 2, fill: false, tension: .25, pointRadius: 2 }
   ]},
   options:{
     responsive:true,maintainAspectRatio:false,
