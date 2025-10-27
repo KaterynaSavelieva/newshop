@@ -140,89 +140,120 @@ def index():
 def dashboard_alias():
     return redirect(url_for("index"))
 
-
-# ─ Звіт: Umsatz pro Tag ─
+# ─ Звіт: продажі по днях з фільтрами дат + кілька клієнтів + кілька товарів ─
 @app.get("/reports/daily")
 @login_required
 def report_daily():
     """
-    📊 Показує звіт по днях з можливістю фільтрації:
-        - за періодом дат
-        - за кількома клієнтами
-        - за кількома товарами
+    (UA) Беремо рядки з v_sales (бо там є kundenID та artikelID),
+    накладаємо фільтри (діапазон дат, кілька клієнтів, кілька товарів),
+    а потім агрегуємо по днях. Так коректно працює фільтрація + графік.
     """
-    # --- 1. Зчитуємо дати з GET або задаємо дефолт ---
-    bis_str = request.args.get("bis") or date.today().isoformat()
-    von_str = request.args.get("von") or (date.fromisoformat(bis_str) - timedelta(days=30)).isoformat()
-    von = date.fromisoformat(von_str)
-    bis = date.fromisoformat(bis_str)
+    from datetime import date, timedelta
+    from flask import request, render_template
 
-    # --- 2. Зчитуємо вибір клієнтів і товарів ---
-    kunden_ids = [int(x) for x in request.args.getlist("kunden") if x.isdigit()]
-    artikel_ids = [int(x) for x in request.args.getlist("artikel") if x.isdigit()]
+    # 1) Дати: якщо не передані, беремо останні 30 днів
+    bis = request.args.get("bis") or date.today().isoformat()
+    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+
+    # 2) Мультивибір із форми (може бути кілька значень або порожньо)
+    #    Перетворюємо на int лише реальні числа, щоб уникнути сміття.
+    kunden_ids = [int(x) for x in request.args.getlist("kunden") if x.strip().isdigit()]
+    artikel_ids = [int(x) for x in request.args.getlist("artikel") if x.strip().isdigit()]
 
     rows = []
-    kunden = []
-    artikel = []
+    totals = {}
+    kunden_list = []
+    artikel_list = []
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            # --- 3. Завантажуємо довідники для фільтрів ---
-            cur.execute("SELECT kundenID, CONCAT(vorname, ' ', nachname) FROM kunden ORDER BY nachname;")
-            kunden = cur.fetchall()
-
-            cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname;")
-            artikel = cur.fetchall()
-
-            # --- 4. Формуємо SQL з умовами ---
-            sql = """
-                SELECT
-                  tag, positionen, menge, rabatt_eur, umsatz, kosten, marge,
-                  umsatz_brutto, marge_brutto, marge_prozent, marge_brutto_prozent
-                FROM v_sales_by_day
-                WHERE tag BETWEEN %s AND %s
-            """
+            # 3) Будуємо WHERE поступово
+            where = ["verkaufsdatum BETWEEN %s AND %s"]  # фільтр дат
             params = [von, bis]
 
             if kunden_ids:
-                sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_ids)) + ")"
+                where.append("kundenID IN (" + ", ".join(["%s"] * len(kunden_ids)) + ")")
                 params.extend(kunden_ids)
 
             if artikel_ids:
-                sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_ids)) + ")"
+                where.append("artikelID IN (" + ", ".join(["%s"] * len(artikel_ids)) + ")")
                 params.extend(artikel_ids)
 
-            sql += " ORDER BY tag"
-            cur.execute(sql, params)
+            where_sql = " AND ".join(where)
+
+            # 4) Агрегуємо по днях з відфільтрованого v_sales
+            cur.execute(
+                f"""
+                SELECT
+                  DATE(verkaufsdatum)                                        AS tag,         -- день
+                  COUNT(*)                                                   AS positionen,  -- рядків продажу (позицій)
+                  SUM(menge)                                                 AS menge,       -- штук
+                  ROUND(SUM(rabatt_eur), 2)                                  AS rabatt_eur,  -- знижка, €
+                  ROUND(SUM(umsatz), 2)                                      AS umsatz,      -- виручка NETTO
+                  ROUND(SUM(kosten), 2)                                      AS kosten,      -- собівартість, €
+                  ROUND(SUM(marge), 2)                                       AS marge,       -- маржа NETTO, €
+                  ROUND(SUM(umsatz_brutto), 2)                               AS umsatz_brutto,      -- виручка BRUTTO
+                  ROUND(SUM(marge_brutto), 2)                                AS marge_brutto,       -- маржа BRUTTO, €
+                  ROUND((NULLIF(SUM(marge), 0) / NULLIF(SUM(umsatz), 0)) * 100, 2)        AS marge_prozent,
+                  ROUND((NULLIF(SUM(marge_brutto), 0) / NULLIF(SUM(umsatz_brutto), 0)) * 100, 2) AS marge_brutto_prozent
+                FROM v_sales
+                WHERE {where_sql}
+                GROUP BY DATE(verkaufsdatum)
+                ORDER BY tag
+                """,
+                params,
+            )
             rows = cur.fetchall()
+
+            # 5) Дані для селектів у формі (щоб показувати список і зберігати вибір)
+            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS name FROM kunden ORDER BY name")
+            kunden_list = cur.fetchall()  # [(id, name), ...]
+
+            cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname")
+            artikel_list = cur.fetchall()  # [(id, name), ...]
+
         conn.close()
 
-    # --- 5. Підсумки ---
-    totals = {
-        "positionen": sum(r[1] for r in rows) if rows else 0,
-        "menge": float(sum(r[2] for r in rows)) if rows else 0.0,
-        "rabatt_eur": float(sum(r[3] for r in rows)) if rows else 0.0,
-        "umsatz": float(sum(r[4] for r in rows)) if rows else 0.0,
-        "kosten": float(sum(r[5] for r in rows)) if rows else 0.0,
-        "marge": float(sum(r[6] for r in rows)) if rows else 0.0,
-        "umsatz_br": float(sum(r[7] for r in rows)) if rows else 0.0,
-        "marge_br": float(sum(r[8] for r in rows)) if rows else 0.0,
-    }
+    # 6) Підсумки для футера
+    if rows:
+        totals = {
+            "positionen": sum(r[1] for r in rows),
+            "menge":      float(sum(r[2] for r in rows)),
+            "rabatt_eur": float(sum(r[3] for r in rows)),
+            "umsatz":     float(sum(r[4] for r in rows)),
+            "kosten":     float(sum(r[5] for r in rows)),
+            "marge":      float(sum(r[6] for r in rows)),
+            "umsatz_br":  float(sum(r[7] for r in rows)),
+            "marge_br":   float(sum(r[8] for r in rows)),
+        }
+    else:
+        totals = {
+            "positionen": 0,
+            "menge":      0.0,
+            "rabatt_eur": 0.0,
+            "umsatz":     0.0,
+            "kosten":     0.0,
+            "marge":      0.0,
+            "umsatz_br":  0.0,
+            "marge_br":   0.0,
+        }
 
-    # --- 6. Рендер шаблону ---
+    # 7) Рендеримо сторінку
     return render_template(
         "reports_daily.html",
         title="Umsatz pro Tag",
         rows=rows,
         totals=totals,
-        von=von_str,
-        bis=bis_str,
-        kunden=kunden,
-        artikel=artikel,
-        sel_kunden=kunden_ids,
-        sel_artikel=artikel_ids
+        von=von,
+        bis=bis,
+        kunden_list=kunden_list,
+        artikel_list=artikel_list,
+        selected_kunden=kunden_ids,
+        selected_artikel=artikel_ids,
     )
+
 
 
 # ─ Health check ─
