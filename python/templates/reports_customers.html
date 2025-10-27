@@ -1,6 +1,5 @@
-﻿{# templates/reports_customers.html #}
-{% extends "base.html" %}
-{% block title %}Umsatz pro Kunde{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Umsatz pro Kunde (Top {{ top_n }}){% endblock %}
 {% block content %}
 
 <style>
@@ -18,6 +17,12 @@
 
     .filters .card {
         min-height: 270px;
+    }
+
+    .action-bar {
+        position: sticky;
+        top: 8px;
+        z-index: 2;
     }
 </style>
 
@@ -37,14 +42,14 @@
             <label class="form-label">Top N</label>
             <input class="form-control" type="number" name="top" min="5" max="100" value="{{ top_n }}">
         </div>
-        <div class="col-md-4 d-flex align-items-end">
-            <button class="btn btn-primary me-2" type="submit">Filtern</button>
+        <div class="col-md-4 d-flex align-items-end justify-content-end gap-2 action-bar">
+            <button class="btn btn-primary" type="submit">Filtern</button>
             <a class="btn btn-outline-secondary" href="{{ url_for('report_customers') }}">Zurücksetzen</a>
         </div>
     </div>
 
-    {# три селекти в один ряд #}
     <div class="row g-3">
+        <!-- Kunde(n) -->
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header py-2">Kunde(n)</div>
@@ -59,6 +64,7 @@
             </div>
         </div>
 
+        <!-- Kundentyp -->
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header py-2">Kundentyp</div>
@@ -73,6 +79,7 @@
             </div>
         </div>
 
+        <!-- Artikel -->
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header py-2">Artikel</div>
@@ -87,6 +94,12 @@
             </div>
         </div>
     </div>
+
+    <!-- дубль кнопок внизу -->
+    <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-primary" type="submit">Filtern</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('report_customers') }}">Zurücksetzen</a>
+    </div>
 </form>
 
 {% if filter_line %}
@@ -96,9 +109,7 @@
 <div class="card mt-3">
     <div class="card-header py-2">Umsatz – Balken &amp; Marge (%) – Linie</div>
     <div class="card-body">
-        <div class="chart-wrap">
-            <canvas id="custChart"></canvas>
-        </div>
+        <div class="chart-wrap"><canvas id="custChart"></canvas></div>
     </div>
 </div>
 
@@ -108,7 +119,6 @@
             <tr>
                 <th>#</th>
                 <th>Kunde</th>
-                <th>Kundentyp</th>
                 <th>Positionen</th>
                 <th>Menge</th>
                 <th>Umsatz (€)</th>
@@ -121,20 +131,19 @@
             {% for r in rows %}
             <tr>
                 <td>{{ loop.index }}</td>
-                <td>{{ r[1] }}</td>
+                <td>{{ r[1] }}</td>   {# Kundenname #}
                 <td>{{ r[2] }}</td>
-                <td>{{ r[3] }}</td>
-                <td>{{ '%.0f'|format(r[4]) }}</td>
+                <td>{{ '%.0f'|format(r[3]) }}</td>
+                <td>{{ '%.2f'|format(r[4]) }}</td>
                 <td>{{ '%.2f'|format(r[5]) }}</td>
                 <td>{{ '%.2f'|format(r[6]) }}</td>
                 <td>{{ '%.2f'|format(r[7]) }}</td>
-                <td>{{ '%.2f'|format(r[8]) }}</td>
             </tr>
             {% endfor %}
         </tbody>
         <tfoot class="table-light">
             <tr>
-                <th colspan="3">Summe</th>
+                <th colspan="2">Summe</th>
                 <th>{{ totals.positionen }}</th>
                 <th>{{ '%.0f'|format(totals.menge) }}</th>
                 <th>{{ '%.2f'|format(totals.umsatz) }}</th>
@@ -150,29 +159,37 @@
 </div>
 
 <script>
-  const labels = {{ rows|map(attribute=1)|list|tojson }};   // Kunde
-  const umsatz = {{ rows|map(attribute=5)|list|tojson }};
-  const marge  = {{ rows|map(attribute=8)|list|tojson }};
+  // Дані з rows: [kundenID, kunde, positionen, menge, umsatz, kosten, marge, marge_pct]
+  const labels    = {{ rows|map(attribute=1)|list|tojson }};
+  const umsatz    = {{ rows|map(attribute=4)|list|tojson }};
+  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};   // новий бар
+  const margePct  = {{ rows|map(attribute=7)|list|tojson }};
 
-  const ctx = document.getElementById('custChart').getContext('2d');
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
+  new Chart(document.getElementById('custChart'),{
+    type:'bar',
+    data:{
       labels,
-      datasets: [
-        { type:'bar',  label:'Umsatz (€)', data: umsatz, yAxisID:'yEur', borderWidth:1 },
-        { type:'line', label:'Marge (%)',  data: marge,  yAxisID:'yPct', borderWidth:2, fill:false, tension:.25, pointRadius:2 }
+      datasets:[
+        { type:'bar',  label:'Umsatz (€)', data: umsatz,    yAxisID:'yEur', borderWidth:1 },
+        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },  // додано
+        { type:'line', label:'Marge (%)',  data: margePct,  yAxisID:'yPct', borderWidth:2, fill:false, tension:.25, pointRadius:2 }
       ]
     },
-    options: {
+    options:{
       responsive:true, maintainAspectRatio:false,
       scales:{
-        yEur:{ position:'left', beginAtZero:true, title:{display:true,text:'€'} },
+        yEur:{ position:'left',  beginAtZero:true, title:{display:true,text:'€'} },
         yPct:{ position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:'%'} },
         x:{ ticks:{ autoSkip:false, maxRotation:45 } }
       },
-      plugins:{ legend:{display:true} }
+      plugins:{ legend:{ display:true } }
     }
+  });
+
+  // Швидкі клавіші
+  document.addEventListener('keydown',(e)=>{
+    if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ document.querySelector('form.filters').submit(); }
+    if(e.key==='Escape'){ window.location="{{ url_for('report_customers') }}"; }
   });
 </script>
 

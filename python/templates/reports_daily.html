@@ -1,4 +1,3 @@
-{# templates/reports_daily.html #}
 {% extends "base.html" %}
 {% block title %}Umsatz pro Tag{% endblock %}
 {% block content %}
@@ -23,25 +22,34 @@
     .meta-line {
         font-size: .95rem;
     }
+
+    .action-bar {
+        position: sticky;
+        top: 8px;
+        z-index: 2;
+    }
 </style>
 
-<h3 class="mb-3">Umsatz pro {{ 'Tag' if grp=='day' else ('Monat' if grp=='month' else 'Jahr') }}</h3>
+<div class="d-flex align-items-center justify-content-between mb-2">
+    <h3 class="mb-0">Umsatz pro Tag</h3>
+</div>
 
 <form class="filters" method="get" action="{{ url_for('report_daily') }}">
     <div class="row g-3 mb-3">
+        <!-- Дати -->
         <div class="col-md-3">
-            <label class="form-label">Von</label>
-            <input class="form-control" type="date" name="von" value="{{ von }}">
+            <label class="form-label">Von:</label>
+            <input type="date" name="von" value="{{ von }}" class="form-control">
         </div>
         <div class="col-md-3">
-            <label class="form-label">Bis</label>
-            <input class="form-control" type="date" name="bis" value="{{ bis }}">
+            <label class="form-label">Bis:</label>
+            <input type="date" name="bis" value="{{ bis }}" class="form-control">
         </div>
 
+        <!-- Інтервал -->
         <div class="col-md-4">
             <label class="form-label d-block">Intervall</label>
             <div class="btn-group" role="group">
-
                 <input class="btn-check" type="radio" name="grp" id="g1" value="day" {{ 'checked' if grp == 'day' else '' }}>
                 <label class="btn btn-outline-primary" for="g1">Tag</label>
 
@@ -50,18 +58,18 @@
 
                 <input class="btn-check" type="radio" name="grp" id="g3" value="year" {{ 'checked' if grp == 'year' else '' }}>
                 <label class="btn btn-outline-primary" for="g3">Jahr</label>
-
             </div>
         </div>
 
-        <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary me-2" type="submit">Filtern</button>
+        <!-- Кнопки -->
+        <div class="col-md-2 d-flex align-items-end justify-content-end gap-2 action-bar">
+            <button class="btn btn-primary" type="submit">Filtern</button>
             <a class="btn btn-outline-secondary" href="{{ url_for('report_daily') }}">Zurücksetzen</a>
         </div>
     </div>
 
-    {# === 3 стовпці в один ряд: Kunde | Kundentyp | Artikel === #}
     <div class="row g-3">
+        <!-- Клієнти -->
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header py-2">Kunde(n)</div>
@@ -76,6 +84,7 @@
             </div>
         </div>
 
+        <!-- Типи клієнтів -->
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header py-2">Kundentyp</div>
@@ -90,6 +99,7 @@
             </div>
         </div>
 
+        <!-- Артикулі -->
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header py-2">Artikel</div>
@@ -104,15 +114,57 @@
             </div>
         </div>
     </div>
+
+    <!-- Дубль кнопок внизу -->
+    <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-primary" type="submit">Filtern</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('report_daily') }}">Zurücksetzen</a>
+    </div>
 </form>
 
-{# === Рядок «Gefiltert» з точними назвами === #}
-{% if filter_line %}
-<div class="alert alert-light border meta-line py-2 mt-3">{{ filter_line|safe }}</div>
+{# Рядок “що відфільтровано” з конкретними назвами #}
+{% set pills = [] %}
+{% if von %}{% set _ = pills.append('von: ' ~ von) %}{% endif %}
+{% if bis %}{% set _ = pills.append('bis: ' ~ bis) %}{% endif %}
+{% if grp %}{% set _ = pills.append('Intervall: ' ~ grp) %}{% endif %}
+
+{# показати конкретні імена, якщо мало вибрано #}
+{% if kunden_sel and kunden_sel|length > 0 %}
+  {% set names = [] %}
+  {% for id, name in kunden_list %}
+    {% if (id|string) in kunden_sel %}{% set _ = names.append(name) %}{% endif %}
+  {% endfor %}
+  {% set _ = pills.append('Kunde: ' ~ (names|join(', '))) %}
 {% endif %}
 
+{% if kundentyp_sel and kundentyp_sel|length > 0 %}
+  {% set names = [] %}
+  {% for id, name in kundentyp_list %}
+    {% if (id|string) in kundentyp_sel %}{% set _ = names.append(name) %}{% endif %}
+  {% endfor %}
+  {% set _ = pills.append('Kundentyp: ' ~ (names|join(', '))) %}
+{% endif %}
+
+{% if artikel_sel and artikel_sel|length > 0 %}
+  {% set names = [] %}
+  {% for id, name in artikel_list %}
+    {% if (id|string) in artikel_sel %}{% set _ = names.append(name) %}{% endif %}
+  {% endfor %}
+  {% set _ = pills.append('Artikel: ' ~ (names|join(', '))) %}
+{% endif %}
+
+{% if pills %}
+<div class="alert alert-light border meta-line py-2 mt-3">
+    Gefiltert:
+    {% for p in pills %}
+    <span class="badge bg-secondary me-1">{{ p }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Графік: Umsatz (€) — бар, Marge (€) — бар, Marge (%) — лінія -->
 <div class="card mt-3">
-    <div class="card-header py-2">Umsatz – Diagramm (€/{{ grp }}) &amp; Marge (%)</div>
+    <div class="card-header py-2">Umsatz – Diagramm (€/{{ 'day' if grp=='day' else ( 'month' if grp=='month' else ( 'year' if grp=='year' else 'day' ) ) }}) &amp; Marge (%)</div>
     <div class="card-body">
         <div class="chart-wrap">
             <canvas id="dailyChart"></canvas>
@@ -120,11 +172,12 @@
     </div>
 </div>
 
+<!-- Таблиця -->
 <div class="table-responsive mt-3">
     <table class="table table-sm table-striped table-bordered align-middle">
         <thead class="table-light">
             <tr>
-                <th>{{ 'Tag' if grp=='day' else ('Monat' if grp=='month' else 'Jahr') }}</th>
+                <th>Tag/Label</th>
                 <th>Positionen</th>
                 <th>Menge</th>
                 <th>Rabatt (€)</th>
@@ -165,19 +218,21 @@
                 <th>{{ '%.2f'|format(totals.marge) }}</th>
                 <th>{{ '%.2f'|format(totals.umsatz_br) }}</th>
                 <th>{{ '%.2f'|format(totals.marge_br) }}</th>
-                {% set marge_pct_total = (100.0 * totals.marge     / (totals.umsatz     if totals.umsatz     != 0 else 1.0)) %}
-                {% set marge_br_total  = (100.0 * totals.marge_br  / (totals.umsatz_br  if totals.umsatz_br  != 0 else 1.0)) %}
+                {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
+                {% set marge_br_pct_total = (100.0 * totals.marge_br / (totals.umsatz_br if totals.umsatz_br != 0 else 1.0)) %}
                 <th>{{ '%.2f'|format(marge_pct_total) }}</th>
-                <th>{{ '%.2f'|format(marge_br_total) }}</th>
+                <th>{{ '%.2f'|format(marge_br_pct_total) }}</th>
             </tr>
         </tfoot>
     </table>
 </div>
 
 <script>
-  const labels = {{ rows|map(attribute=0)|list|tojson }};
-  const umsatz = {{ rows|map(attribute=4)|list|tojson }};
-  const margePct = {{ rows|map(attribute=9)|list|tojson }};
+  // Дані для графіка
+  const labels    = {{ rows|map(attribute=0)|list|tojson }};
+  const umsatz    = {{ rows|map(attribute=4)|list|tojson }};  // €
+  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};  // €  <-- ДОДАНО
+  const margePct  = {{ rows|map(attribute=9)|list|tojson }};  // %
 
   const ctx = document.getElementById('dailyChart').getContext('2d');
   new Chart(ctx, {
@@ -185,18 +240,20 @@
     data: {
       labels,
       datasets: [
-        { type:'bar',  label:'Umsatz (€)', data: umsatz,  yAxisID:'yEur', borderWidth:1 },
-        { type:'line', label:'Marge (%)',  data: margePct, yAxisID:'yPct', borderWidth:2, fill:false, tension:.25, pointRadius:2 }
+        { type:'bar',  label:'Umsatz (€)', data: umsatz,    yAxisID:'yEur', borderWidth:1 },
+        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },  // новий стовпчик
+        { type:'line', label:'Marge (%)',  data: margePct,  yAxisID:'yPct', borderWidth:2, fill:false, tension:0.25, pointRadius:2 }
       ]
     },
     options: {
-      responsive:true, maintainAspectRatio:false,
+      responsive:true,
+      maintainAspectRatio:false,
       scales:{
-        yEur:{ position:'left', beginAtZero:true, title:{display:true,text:'€'} },
-        yPct:{ position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:'%'} },
+        yEur:{ type:'linear', position:'left',  title:{display:true, text:'€'}, beginAtZero:true },
+        yPct:{ type:'linear', position:'right', title:{display:true, text:'%'}, beginAtZero:true, grid:{ drawOnChartArea:false } },
         x:{ ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:14 } }
       },
-      plugins:{ legend:{display:true} }
+      plugins:{ legend:{ display:true } }
     }
   });
 </script>
