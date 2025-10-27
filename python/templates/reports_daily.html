@@ -1,241 +1,181 @@
+{# templates/reports_daily.html #}
 {% extends "base.html" %}
+
+{% block title %}Umsatz pro Tag{% endblock %}
+
 {% block content %}
+<h1 class="mb-3">Umsatz pro Tag</h1>
 
-<h1>{{ title }}</h1>
+{# ─────────────────────────────────────────────────────────────
+   Форма фільтрів:
+   - Von/Bis (дати)
+   - Kunde(n) (мультивибір)
+   - Artikel (мультивибір)
+   Після сабміту GET-параметри збережуться у формі (selected/values)
+   ───────────────────────────────────────────────────────────── #}
+<form class="card p-3 mb-4" method="get" action="{{ url_for('report_daily') }}">
+  <div class="row g-3">
+    <div class="col-md-2">
+      <label for="von" class="form-label">Von:</label>
+      <input type="date" class="form-control" id="von" name="von" value="{{ von }}">
+    </div>
+    <div class="col-md-2">
+      <label for="bis" class="form-label">Bis:</label>
+      <input type="date" class="form-control" id="bis" name="bis" value="{{ bis }}">
+    </div>
 
-<!-- Фільтр дат -->
-<form method="get" style="margin-bottom: 1em;">
-  <label>Von:
-    <input type="date" name="von" value="{{ von }}">
-  </label>
-  <label>Bis:
-    <input type="date" name="bis" value="{{ bis }}">
-  </label>
-  <button type="submit">Filtern</button>
-  <a href="{{ url_for('report_daily') }}">Zurücksetzen</a>
+    <div class="col-md-4">
+      <label for="kunden" class="form-label">Kunde(n):</label>
+      {# multiple — дозволяє обрати кілька; size — скільки елементів видно #}
+      <select id="kunden" name="kunden" class="form-select" multiple size="6">
+        {% for k in kunden %}
+          {# k = (kundenID, name) #}
+          <option value="{{ k[0] }}" {% if k[0] in sel_kunden %}selected{% endif %}>
+            {{ k[1] }}
+          </option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+    </div>
+
+    <div class="col-md-4">
+      <label for="artikel" class="form-label">Artikel:</label>
+      <select id="artikel" name="artikel" class="form-select" multiple size="6">
+        {% for a in artikel %}
+          {# a = (artikelID, produktname) #}
+          <option value="{{ a[0] }}" {% if a[0] in sel_artikel %}selected{% endif %}>
+            {{ a[1] }}
+          </option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Filtern</button>
+    {# Кнопка «скинути» — просто переходить на /reports/daily без параметрів #}
+    <a class="btn btn-outline-secondary" href="{{ url_for('report_daily') }}">Zurücksetzen</a>
+  </div>
 </form>
 
-<!-- Легенда -->
-<div style="display:flex; gap:18px; align-items:center; margin:8px 0 6px 0; font-size:14px;">
-  <span style="display:inline-flex; align-items:center; gap:8px;">
-    <span style="width:12px; height:12px; border-radius:50%; background:#2b7cff; display:inline-block;"></span>
-    Umsatz (€)
-  </span>
-  <span style="display:inline-flex; align-items:center; gap:8px;">
-    <span style="width:12px; height:12px; border-radius:50%; background:#10b981; display:inline-block;"></span>
-    Marge (€)
-  </span>
+{# ─────────────────────────────────────────────────────────────
+   Блок з графіком: дві серії — Umsatz (€) та Marge (€)
+   Дані беремо з rows:
+   0: tag, 4: umsatz, 6: marge
+   ───────────────────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Umsatz – Diagramm (€/Tag)</h5>
+    <canvas id="chartUmsatz" height="100"></canvas>
+  </div>
 </div>
 
-<!-- Графік (SVG, без бібліотек) -->
-<section style="margin:10px 0 18px 0;">
-  <div style="border:1px solid #d8d8d8; border-radius:12px; padding:10px; background:#fff;">
-    <svg id="chart" viewBox="0 0 640 260" width="100%" height="260" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stop-color="#2b7cff" stop-opacity="0.20"/>
-          <stop offset="100%" stop-color="#2b7cff" stop-opacity="0.02"/>
-        </linearGradient>
-      </defs>
+{# ─────────────────────────────────────────────────────────────
+   Таблиця з підсумками за днями.
+   Імена колонок — німецькою.
+   Індекси полів у rows:
+   0 tag | 1 positionen | 2 menge | 3 rabatt_eur | 4 umsatz
+   5 kosten | 6 marge | 7 umsatz_brutto | 8 marge_brutto
+   9 marge_prozent | 10 marge_brutto_prozent
+   ───────────────────────────────────────────────────────────── #}
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Tag</th>
+        <th>Positionen</th>
+        <th>Menge</th>
+        <th>Rabatt (€)</th>
+        <th>Umsatz (€)</th>
+        <th>Kosten (€)</th>
+        <th>Marge (€)</th>
+        <th>Umsatz brutto (€)</th>
+        <th>Marge brutto (€)</th>
+        <th>Marge (%)</th>
+        <th>Marge brutto (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r[0] }}</td>
+        <td class="text-end">{{ r[1] }}</td>
+        <td class="text-end">{{ "%.0f"|format(r[2]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[3]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[4]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[5]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[6]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[7]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[8]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[9]) }}</td>
+        <td class="text-end">{{ "%.2f"|format(r[10]) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="table-light">
+      <tr>
+        <th>Summe</th>
+        <th class="text-end">{{ totals.positionen }}</th>
+        <th class="text-end">{{ "%.0f"|format(totals.menge) }}</th>
+        <th class="text-end">{{ "%.2f"|format(totals.rabatt_eur) }}</th>
+        <th class="text-end">{{ "%.2f"|format(totals.umsatz) }}</th>
+        <th class="text-end">{{ "%.2f"|format(totals.kosten) }}</th>
+        <th class="text-end">{{ "%.2f"|format(totals.marge) }}</th>
+        <th class="text-end">{{ "%.2f"|format(totals.umsatz_br) }}</th>
+        <th class="text-end">{{ "%.2f"|format(totals.marge_br) }}</th>
+        <th></th>
+        <th></th>
+      </tr>
+    </tfoot>
+  </table>
+</div>
 
-      <g id="grid"></g>
-      <text id="maxLabel" x="46" y="14" fill="#6b7280" font-size="11"></text>
-
-      <!-- Площа тільки для Umsatz -->
-      <path id="areaU"  d="" fill="url(#areaFill)" stroke="none"></path>
-
-      <!-- Лінії -->
-      <path id="lineU" d="" fill="none" stroke="#2b7cff" stroke-width="2.2"></path>
-      <path id="lineM" d="" fill="none" stroke="#10b981" stroke-width="2.2"></path>
-
-      <!-- Точки -->
-      <g id="dotsU"></g>
-      <g id="dotsM"></g>
-    </svg>
-
-    <div id="xTicks" style="display:flex; gap:10px; margin:6px 0 0 46px; flex-wrap:wrap; font-size:11px; color:#6b7280;"></div>
-  </div>
-</section>
-
-<!-- Таблиця -->
-<table border="1" cellspacing="0" cellpadding="4" style="border-collapse: collapse; width:100%; font-size:14px;">
-  <thead style="background:#f4f4f4;">
-    <tr>
-      <th>Tag</th>
-      <th>Positionen</th>
-      <th>Menge</th>
-      <th>Rabatt (€)</th>
-      <th>Umsatz (€)</th>
-      <th>Kosten (€)</th>
-      <th>Marge (€)</th>
-      <th>Umsatz brutto (€)</th>
-      <th>Marge brutto (€)</th>
-      <th>Marge (%)</th>
-      <th>Marge brutto (%)</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for r in rows %}
-    <tr>
-      <td>{{ r[0] }}</td>
-      <td style="text-align:right;">{{ r[1] }}</td>
-      <td style="text-align:right;">{{ r[2] }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[3]) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[4]) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[5]) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[6]) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[7]) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[8]) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[9]) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(r[10]) }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-  <tfoot style="background:#fafafa; font-weight:bold;">
-    <tr>
-      <td>Summe</td>
-      <td style="text-align:right;">{{ rows|sum(attribute=1) }}</td>
-      <td style="text-align:right;">{{ rows|sum(attribute=2) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=3)) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=4)) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=5)) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=6)) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=7)) }}</td>
-      <td style="text-align:right;">{{ "%.2f"|format(rows|sum(attribute=8)) }}</td>
-      <td colspan="2"></td>
-    </tr>
-  </tfoot>
-</table>
-
-<!-- JS для графіка -->
+{# ─────────────────────────────────────────────────────────────
+   Підключення Chart.js (CDN) і побудова лінійного графіка.
+   Якщо у твоєму base.html вже є Chart.js — цей <script> можна прибрати.
+   ───────────────────────────────────────────────────────────── #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // Дані з Flask (індекси: 4 = Umsatz, 6 = Marge)
-  const datesRaw = {{ rows|map(attribute=0)|list|tojson }};
-  const valuesU  = {{ rows|map(attribute=4)|list|tojson }};
-  const valuesM  = {{ rows|map(attribute=6)|list|tojson }};
+  // Дані для графіка беремо з Jinja-перемінних (rows)
+  // Створюємо масиви ярликів (дні) та значень Umsatz/Marge
+  const labels = [{% for r in rows %}"{{ r[0] }}"{% if not loop.last %},{% endif %}{% endfor %}];
+  const umsatz = [{% for r in rows %}{{ "%.2f"|format(r[4]) }}{% if not loop.last %},{% endif %}{% endfor %}];
+  const marge  = [{% for r in rows %}{{ "%.2f"|format(r[6]) }}{% if not loop.last %},{% endif %}{% endfor %}];
 
-  const fmtDate = s => {
-    const d = new Date(s);
-    if (!isNaN(d)) {
-      const dd = String(d.getDate()).padStart(2,'0');
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      return `${dd}.${mm}`;
+  const ctx = document.getElementById('chartUmsatz').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Umsatz (€)',
+          data: umsatz,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 2
+        },
+        {
+          label: 'Marge (€)',
+          data: marge,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 2
+        }
+      ]
+    },
+    options: {
+      plugins: {
+        legend: { display: true },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { ticks: { maxRotation: 0, autoSkip: true } },
+        y: { beginAtZero: true }
+      }
     }
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-    return m ? `${m[3]}.${m[2]}` : s;
-  };
-
-  // Розміри полотна
-  const W=640,H=260,L=46,R=10,T=20,B=26;
-  const innerW=W-L-R, innerH=H-T-B;
-
-  const maxU = Math.max(1, ...valuesU);
-  const maxM = Math.max(1, ...valuesM);
-  const maxValRaw = Math.max(maxU, maxM);
-
-  // Скругляємо верх межі Y красиво
-  const pow = Math.pow(10, Math.max(0, String(Math.floor(maxValRaw)).length - 1));
-  const yMax = Math.ceil(maxValRaw / pow) * pow;
-
-  document.getElementById('maxLabel').textContent = `max ≈ € ${yMax.toFixed(0)}`;
-
-  const n = valuesU.length;
-  const stepX = n > 1 ? innerW / (n - 1) : 0;
-
-  const toPts = (vals) => vals.map((v,i) => {
-    const x = L + stepX * i;
-    const y = T + innerH * (1 - (v / yMax));
-    return [x,y];
   });
-
-  const ptsU = toPts(valuesU);
-  const ptsM = toPts(valuesM);
-
-  // Грід + підписи по Y
-  const grid = document.getElementById('grid');
-  const gridLines = 5;
-  for (let i=0; i<=gridLines; i++) {
-    const y = T + innerH * (i / gridLines);
-    const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
-    ln.setAttribute('x1', L); ln.setAttribute('x2', W-R);
-    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
-    ln.setAttribute('stroke', i===gridLines ? '#d1d5db' : '#eee');
-    grid.appendChild(ln);
-
-    if (i < gridLines) {
-      const val = ((gridLines - i) / gridLines) * yMax;
-      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
-      txt.setAttribute('x', 4);
-      txt.setAttribute('y', y + 4);
-      txt.setAttribute('fill', '#9ca3af');
-      txt.setAttribute('font-size', '10');
-      txt.textContent = val.toFixed(0);
-      grid.appendChild(txt);
-    }
-  }
-
-  // Згладжена лінія (квадратні Безьє)
-  const quadPath = (pts) => {
-    if (pts.length === 0) return '';
-    if (pts.length === 1) return `M ${pts[0][0]} ${pts[0][1]}`;
-    let d = `M ${pts[0][0]} ${pts[0][1]}`;
-    for (let i=1; i<pts.length; i++) {
-      const [x0,y0] = pts[i-1];
-      const [x1,y1] = pts[i];
-      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      d += ` Q ${x0} ${y0}, ${cx} ${cy}`;
-    }
-    const [xe,ye] = pts[pts.length-1];
-    d += ` T ${xe} ${ye}`;
-    return d;
-  };
-
-  const lineU = quadPath(ptsU);
-  const lineM = quadPath(ptsM);
-
-  document.getElementById('lineU').setAttribute('d', lineU);
-  document.getElementById('lineM').setAttribute('d', lineM);
-
-  // Площа під Umsatz
-  if (ptsU.length > 1) {
-    const areaD = lineU + ` L ${ptsU[ptsU.length-1][0]} ${T+innerH} L ${ptsU[0][0]} ${T+innerH} Z`;
-    document.getElementById('areaU').setAttribute('d', areaD);
-  }
-
-  // Точки з тултіпами
-  const addDots = (groupId, pts, vals, color) => {
-    const g = document.getElementById(groupId);
-    const dates = datesRaw.map(fmtDate);
-    pts.forEach((p,i) => {
-      const [x,y] = p;
-      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      c.setAttribute('cx', x);
-      c.setAttribute('cy', y);
-      c.setAttribute('r', 3.2);
-      c.setAttribute('fill', color);
-      c.style.cursor = 'pointer';
-      const t = document.createElementNS('http://www.w3.org/2000/svg','title');
-      t.textContent = `${dates[i]} • € ${(+vals[i]).toFixed(2)}`;
-      c.appendChild(t);
-      c.addEventListener('mouseenter', () => { c.setAttribute('r', 5); c.setAttribute('fill', '#ff7f2b'); });
-      c.addEventListener('mouseleave', () => { c.setAttribute('r', 3.2); c.setAttribute('fill', color); });
-      g.appendChild(c);
-    });
-  };
-
-  addDots('dotsU', ptsU, valuesU, '#2b7cff'); // Umsatz
-  addDots('dotsM', ptsM, valuesM, '#10b981'); // Marge
-
-  // Підписи по X (обмежуємо до 8)
-  const xTicks = document.getElementById('xTicks');
-  const dates = datesRaw.map(fmtDate);
-  const ticks = Math.min(8, dates.length);
-  for (let i=0; i<ticks; i++) {
-    const idx = Math.round(i * (dates.length - 1) / (ticks - 1));
-    const span = document.createElement('span');
-    span.textContent = dates[idx];
-    xTicks.appendChild(span);
-  }
 </script>
-
 {% endblock %}

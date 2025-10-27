@@ -1,18 +1,46 @@
+{# templates/login.html #}
 {% extends "base.html" %}
+
+{% block title %}Anmelden{% endblock %}
+
 {% block content %}
-<h1>Anmelden</h1>
+<div class="d-flex justify-content-center align-items-center" style="min-height: 70vh;">
+  <div class="card shadow-sm" style="width: 360px;">
+    <div class="card-body">
+      <h4 class="card-title text-center mb-3">Anmeldung</h4>
+      <p class="text-muted text-center mb-4">Bitte geben Sie Ihre Zugangsdaten ein.</p>
 
-{% if error %}
-  <p style="color:#b00020">{{ error }}</p>
-{% endif %}
+      {# ───── Форма входу ───── #}
+      <form method="post" action="{{ url_for('login') }}">
+        <div class="mb-3">
+          <label for="email" class="form-label">E-Mail-Adresse</label>
+          <input type="email" class="form-control" id="email" name="email"
+                 placeholder="name@example.com" required autofocus>
+        </div>
 
-<form method="post" action="{{ url_for('login') }}" style="max-width:360px">
-  <label for="email">E-Mail</label><br>
-  <input id="email" name="email" type="email" required style="width:100%"><br><br>
+        <div class="mb-3">
+          <label for="password" class="form-label">Passwort</label>
+          <input type="password" class="form-control" id="password" name="password"
+                 placeholder="********" required>
+        </div>
 
-  <label for="password">Passwort</label><br>
-  <input id="password" name="password" type="password" required style="width:100%"><br><br>
+        {# якщо помилка логіну — показуємо червоне повідомлення #}
+        {% if error %}
+          <div class="alert alert-danger py-2 small" role="alert">
+            {{ error }}
+          </div>
+        {% endif %}
 
-  <button type="submit">Einloggen</button>
-</form>
+        <div class="d-grid mt-4">
+          <button type="submit" class="btn btn-primary">Anmelden</button>
+        </div>
+      </form>
+    </div>
+
+    {# нижній блок картки #}
+    <div class="card-footer text-center small text-muted">
+      <span>Demo-Zugang:</span> <code>user@example.com / demo123</code>
+    </div>
+  </div>
+</div>
 {% endblock %}

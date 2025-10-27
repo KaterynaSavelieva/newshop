@@ -1,19 +1,17 @@
 # python/dashboard.py
 # Dashboard (DE) + Login/Logout via Flask-Login
 # Показує: Kunde, Kundentyp, Artikel, Menge, VK-Preis, EK-Preis, Umsatz, Kosten, Marge
-# Додає звіт /reports/daily (Umsatz pro Tag) з фільтром дат
+# Додає звіт /reports/daily (Umsatz pro Tag) з фільтром дат, клієнтів і товарів
 
 import os
-from datetime import date, timedelta
-
+from datetime import date, datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user
 )
 from werkzeug.security import check_password_hash
-
-from .db import get_conn  # підключення до БД newshopdb
+from .db import get_conn  # наша функція підключення до БД newshopdb
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev")  # секрет для сесій
@@ -22,7 +20,8 @@ app.secret_key = os.getenv("FLASK_SECRET", "dev")  # секрет для сес�
 login_manager = LoginManager(app)
 login_manager.login_view = "login"   # якщо не залогінена → редірект на /login
 
-# Модель-контейнер (не ORM). Дані беремо з БД.
+
+# Модель користувача (простий контейнер, не ORM)
 class User(UserMixin):
     def __init__(self, id, email, name, role, is_active):
         self.id = str(id)
@@ -34,7 +33,8 @@ class User(UserMixin):
     def is_active(self):
         return self.active
 
-# завантаження користувача за id (для сесій)
+
+# Завантаження користувача з таблиці users
 @login_manager.user_loader
 def load_user(user_id: str):
     conn = get_conn()
@@ -51,15 +51,16 @@ def load_user(user_id: str):
         return None
     return User(*row)
 
-# робимо current_user доступним у всіх шаблонах
+
+# Додаємо current_user у всі шаблони
 @app.context_processor
 def inject_user():
     return dict(current_user=current_user)
 
-# ─ Маршрути авторизації ─
+
+# ─ Авторизація ─
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # якщо вже залогінена — на дашборд
     if current_user.is_authenticated:
         return redirect(url_for("index"))
 
@@ -71,14 +72,11 @@ def login():
         conn = get_conn()
         if conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT id, email, name, role, is_active, password_hash
                     FROM users
                     WHERE email=%s AND is_active=1
-                    """,
-                    (email,)
-                )
+                """, (email,))
                 row = cur.fetchone()
             conn.close()
 
@@ -86,7 +84,7 @@ def login():
                 uid, uemail, uname, urole, uactive, phash = row
                 if check_password_hash(phash, password):
                     user = User(uid, uemail, uname, urole, uactive)
-                    login_user(user)          # створюємо сесію
+                    login_user(user)
                     flash("Erfolgreich eingeloggt.", "success")
                     return redirect(url_for("index"))
                 else:
@@ -98,6 +96,7 @@ def login():
 
     return render_template("login.html", title="Anmelden", error=error)
 
+
 @app.get("/logout")
 @login_required
 def logout():
@@ -105,110 +104,132 @@ def logout():
     flash("Abgemeldet.", "info")
     return redirect(url_for("login"))
 
-# ─ Головний дашборд ─
+
+# ─ Головна сторінка (останні продажі) ─
 @app.get("/")
 @login_required
 def index():
-    """
-    Використовуємо VIEW v_sales, щоб отримати:
-    datum, kunde, kundentyp, artikel, menge, vk_preis, ek_preis, umsatz, kosten, marge
-    """
     rows = []
     totals = {"umsatz": 0.0, "kosten": 0.0, "marge": 0.0}
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT
-                    verkaufsdatum,   -- 0
-                    kunde,           -- 1
-                    kundentyp,       -- 2
-                    artikel,         -- 3
-                    menge,           -- 4
-                    vk_preis,        -- 5
-                    ek_preis,        -- 6
-                    umsatz,          -- 7  (нетто, після знижки)
-                    kosten,          -- 8
-                    marge            -- 9
+                    verkaufsdatum, kunde, kundentyp, artikel,
+                    menge, vk_preis, ek_preis, umsatz, kosten, marge
                 FROM v_sales
                 ORDER BY verkaufsdatum DESC
                 LIMIT 100;
-                """
-            )
+            """)
             rows = cur.fetchall()
         conn.close()
 
-        # підсумки по вибірці
+        # підсумки (просто для відображення внизу таблиці)
         if rows:
             totals["umsatz"] = float(sum(r[7] for r in rows))
             totals["kosten"] = float(sum(r[8] for r in rows))
             totals["marge"]  = float(sum(r[9] for r in rows))
 
-    # у шаблон віддаємо rows (рядки таблиці) і totals (підсумки)
     return render_template("dashboard.html", rows=rows, totals=totals, title="Dashboard")
 
-# Дружній маршрут /dashboard (на всяк випадок)
+
 @app.get("/dashboard")
 @login_required
 def dashboard_alias():
     return redirect(url_for("index"))
 
-# ─ Звіт: продажі по днях ─
+
+# ─ Звіт: Umsatz pro Tag ─
 @app.get("/reports/daily")
 @login_required
 def report_daily():
     """
-    Читає агреговані дані з v_sales_by_day у діапазоні дат [von..bis].
-    Якщо параметри не задані — останні 30 днів.
+    📊 Показує звіт по днях з можливістю фільтрації:
+        - за періодом дат
+        - за кількома клієнтами
+        - за кількома товарами
     """
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+    # --- 1. Зчитуємо дати з GET або задаємо дефолт ---
+    bis_str = request.args.get("bis") or date.today().isoformat()
+    von_str = request.args.get("von") or (date.fromisoformat(bis_str) - timedelta(days=30)).isoformat()
+    von = date.fromisoformat(von_str)
+    bis = date.fromisoformat(bis_str)
+
+    # --- 2. Зчитуємо вибір клієнтів і товарів ---
+    kunden_ids = [int(x) for x in request.args.getlist("kunden") if x.isdigit()]
+    artikel_ids = [int(x) for x in request.args.getlist("artikel") if x.isdigit()]
 
     rows = []
+    kunden = []
+    artikel = []
+
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            # --- 3. Завантажуємо довідники для фільтрів ---
+            cur.execute("SELECT kundenID, CONCAT(vorname, ' ', nachname) FROM kunden ORDER BY nachname;")
+            kunden = cur.fetchall()
+
+            cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname;")
+            artikel = cur.fetchall()
+
+            # --- 4. Формуємо SQL з умовами ---
+            sql = """
                 SELECT
                   tag, positionen, menge, rabatt_eur, umsatz, kosten, marge,
                   umsatz_brutto, marge_brutto, marge_prozent, marge_brutto_prozent
                 FROM v_sales_by_day
                 WHERE tag BETWEEN %s AND %s
-                ORDER BY tag
-                """,
-                (von, bis)
-            )
+            """
+            params = [von, bis]
+
+            if kunden_ids:
+                sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_ids)) + ")"
+                params.extend(kunden_ids)
+
+            if artikel_ids:
+                sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_ids)) + ")"
+                params.extend(artikel_ids)
+
+            sql += " ORDER BY tag"
+            cur.execute(sql, params)
             rows = cur.fetchall()
         conn.close()
 
-    # підсумки (для футера таблиці)
+    # --- 5. Підсумки ---
     totals = {
         "positionen": sum(r[1] for r in rows) if rows else 0,
-        "menge":      float(sum(r[2] for r in rows)) if rows else 0.0,
+        "menge": float(sum(r[2] for r in rows)) if rows else 0.0,
         "rabatt_eur": float(sum(r[3] for r in rows)) if rows else 0.0,
-        "umsatz":     float(sum(r[4] for r in rows)) if rows else 0.0,
-        "kosten":     float(sum(r[5] for r in rows)) if rows else 0.0,
-        "marge":      float(sum(r[6] for r in rows)) if rows else 0.0,
-        "umsatz_br":  float(sum(r[7] for r in rows)) if rows else 0.0,
-        "marge_br":   float(sum(r[8] for r in rows)) if rows else 0.0,
+        "umsatz": float(sum(r[4] for r in rows)) if rows else 0.0,
+        "kosten": float(sum(r[5] for r in rows)) if rows else 0.0,
+        "marge": float(sum(r[6] for r in rows)) if rows else 0.0,
+        "umsatz_br": float(sum(r[7] for r in rows)) if rows else 0.0,
+        "marge_br": float(sum(r[8] for r in rows)) if rows else 0.0,
     }
 
+    # --- 6. Рендер шаблону ---
     return render_template(
         "reports_daily.html",
         title="Umsatz pro Tag",
         rows=rows,
         totals=totals,
-        von=von,
-        bis=bis
+        von=von_str,
+        bis=bis_str,
+        kunden=kunden,
+        artikel=artikel,
+        sel_kunden=kunden_ids,
+        sel_artikel=artikel_ids
     )
 
-# ─ Health для швидкої перевірки ─
+
+# ─ Health check ─
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 if __name__ == "__main__":
     # слухаємо всі інтерфейси, щоб відкривати з ноутбука

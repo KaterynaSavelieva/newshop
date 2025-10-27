@@ -105,7 +105,7 @@ def main():
             day = random.randint(1, 30)
             hour = random.randint(8, 20)
             minute = random.randint(0, 59)
-            when = datetime(2025, 9, day, hour, minute, 0)
+            when = datetime(2025, 7, day, hour, minute, 0)
 
             # 3) шапка продажу
             verkauf_id, when = create_sale_header(cur, kunden_id, when)

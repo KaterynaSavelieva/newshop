@@ -1,32 +1,124 @@
+{# templates/base.html #}
 <!doctype html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <title>{{ title or "NewShop" }}</title>
+  {# заголовок сторінки; якщо не передано title — показати "Dashboard" #}
+  <title>{% block title %}{{ title or "Dashboard" }}{% endblock %}</title>
+
+  {# мобільна адаптивність #}
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  {# Bootstrap 5 (лише CSS). Проста, легка стилізація форм і таблиць #}
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+  {# невеликий кастомний стиль (акуратні відступи, тонші таблиці) #}
   <style>
-    body { font-family: Calibri, sans-serif; margin: 24px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #888; padding: 6px 10px; text-align: left; }
-    nav a { margin-right: 12px; color: #0066cc; text-decoration: none; }
-    nav a:hover { text-decoration: underline; }
+    body { background: #f7f7f9; }
+    .navbar-brand { font-weight: 600; }
+    .content-wrap { padding-top: 16px; padding-bottom: 32px; }
+    .card { border-radius: 12px; }
+    .table thead th { white-space: nowrap; }
+    .form-text { font-size: 0.8rem; }
   </style>
+
+  {# хук для додаткових стилів на окремих сторінках #}
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
 
-<nav>
-  {% if current_user.is_authenticated %}
-    Hallo, {{ current_user.name }}!
-    <a href="{{ url_for('index') }}">Dashboard</a>
-    <a href="{{ url_for('logout') }}">Abmelden</a>
-  {% else %}
-    <a href="{{ url_for('login') }}">Anmelden</a>
-  {% endif %}
-</nav>
+  {# ───────── Навбар (верхнє меню) ─────────
+     Пояснення: просте меню з посиланнями на головну та звіт по днях.
+     Праворуч показує ім'я користувача (якщо залогінений) і лінк "Abmelden".
+  #}
+  <nav class="navbar navbar-expand-lg bg-white border-bottom shadow-sm">
+    <div class="container">
+      <a class="navbar-brand" href="{{ url_for('index') }}">NewShop • Dashboard</a>
 
-<hr>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav"
+              aria-controls="topNav" aria-expanded="false" aria-label="Menü">
+        <span class="navbar-toggler-icon"></span>
+      </button>
 
-<!-- 🔹 Сюди вставляються конкретні сторінки -->
-{% block content %}{% endblock %}
+      <div class="collapse navbar-collapse" id="topNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == url_for('index') %}active{% endif %}"
+               href="{{ url_for('index') }}">Start</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path.startswith('/reports/daily') %}active{% endif %}"
+               href="{{ url_for('report_daily') }}">Umsatz pro Tag</a>
+          </li>
+        </ul>
 
+        <ul class="navbar-nav ms-auto">
+          {% if current_user.is_authenticated %}
+            <li class="nav-item">
+              <span class="nav-link disabled">
+                👤 {{ current_user.name or current_user.email }}
+              </span>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('logout') }}">Abmelden</a>
+            </li>
+          {% else %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('login') }}">Anmelden</a>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  {# ───────── Контент + флеші ─────────
+     Пояснення: блок для flash() повідомлень (успіх/помилка) і місце,
+     куди шаблони вставляють свій вміст через {% block content %}.
+  #}
+  <main class="content-wrap">
+    <div class="container">
+
+      {# флеш-повідомлення (успіх/інфо/помилка) #}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              {# мапимо категорії Flask: success/info/warning/danger #}
+              {% set cls = {
+                'success':'alert-success',
+                'info':'alert-info',
+                'warning':'alert-warning',
+                'error':'alert-danger',
+                'danger':'alert-danger'
+              }[category] if category in ['success','info','warning','error','danger'] else 'alert-secondary' %}
+              <div class="alert {{ cls }} py-2 px-3 mb-2" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {# основний контент сторінок #}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {# ───────── Футер ───────── #}
+  <footer class="border-top py-3">
+    <div class="container text-muted small">
+      © {{  now().year if false else "" }} NewShop — Demo Dashboard
+    </div>
+  </footer>
+
+  {# Bootstrap JS (для меню на мобільних). Якщо не потрібен — можна прибрати #}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+          crossorigin="anonymous"></script>
+
+  {# хук для додаткових скриптів зі сторінок (наприклад, графіки) #}
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>
