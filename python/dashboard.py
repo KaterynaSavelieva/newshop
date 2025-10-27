@@ -1,27 +1,27 @@
 # python/dashboard.py
 # Dashboard (DE) + Login/Logout via Flask-Login
-# Показує: Kunde, Kundentyp, Artikel, Menge, VK-Preis, EK-Preis, Umsatz, Kosten, Marge
-# Додає звіт /reports/daily (Umsatz pro Tag) з фільтром дат, клієнтів і товарів
+# Звіт /reports/daily з фільтрами та графіком (Umsatz=bar, Marge%=line)
 
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user
 )
 from werkzeug.security import check_password_hash
+
 from .db import get_conn  # наша функція підключення до БД newshopdb
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET", "dev")  # секрет для сесій
+app.secret_key = os.getenv("FLASK_SECRET", "dev")
 
 # ─ Flask-Login ─
 login_manager = LoginManager(app)
-login_manager.login_view = "login"   # якщо не залогінена → редірект на /login
+login_manager.login_view = "login"
 
-
-# Модель користувача (простий контейнер, не ORM)
+# Проста модель користувача (дані з БД)
 class User(UserMixin):
     def __init__(self, id, email, name, role, is_active):
         self.id = str(id)
@@ -33,8 +33,6 @@ class User(UserMixin):
     def is_active(self):
         return self.active
 
-
-# Завантаження користувача з таблиці users
 @login_manager.user_loader
 def load_user(user_id: str):
     conn = get_conn()
@@ -51,12 +49,9 @@ def load_user(user_id: str):
         return None
     return User(*row)
 
-
-# Додаємо current_user у всі шаблони
 @app.context_processor
 def inject_user():
     return dict(current_user=current_user)
-
 
 # ─ Авторизація ─
 @app.route("/login", methods=["GET", "POST"])
@@ -72,19 +67,21 @@ def login():
         conn = get_conn()
         if conn:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, email, name, role, is_active, password_hash
                     FROM users
                     WHERE email=%s AND is_active=1
-                """, (email,))
+                    """,
+                    (email,)
+                )
                 row = cur.fetchone()
             conn.close()
 
             if row:
                 uid, uemail, uname, urole, uactive, phash = row
                 if check_password_hash(phash, password):
-                    user = User(uid, uemail, uname, urole, uactive)
-                    login_user(user)
+                    login_user(User(uid, uemail, uname, urole, uactive))
                     flash("Erfolgreich eingeloggt.", "success")
                     return redirect(url_for("index"))
                 else:
@@ -96,7 +93,6 @@ def login():
 
     return render_template("login.html", title="Anmelden", error=error)
 
-
 @app.get("/logout")
 @login_required
 def logout():
@@ -104,8 +100,7 @@ def logout():
     flash("Abgemeldet.", "info")
     return redirect(url_for("login"))
 
-
-# ─ Головна сторінка (останні продажі) ─
+# ─ Головний дашборд (простий приклад останніх операцій) ─
 @app.get("/")
 @login_required
 def index():
@@ -115,18 +110,27 @@ def index():
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
-                    verkaufsdatum, kunde, kundentyp, artikel,
-                    menge, vk_preis, ek_preis, umsatz, kosten, marge
+                    verkaufsdatum,   -- 0
+                    kunde,           -- 1
+                    kundentyp,       -- 2
+                    artikel,         -- 3
+                    menge,           -- 4
+                    vk_preis,        -- 5
+                    ek_preis,        -- 6
+                    umsatz,          -- 7 (нетто)
+                    kosten,          -- 8
+                    marge            -- 9
                 FROM v_sales
                 ORDER BY verkaufsdatum DESC
-                LIMIT 100;
-            """)
+                LIMIT 100
+                """
+            )
             rows = cur.fetchall()
         conn.close()
 
-        # підсумки (просто для відображення внизу таблиці)
         if rows:
             totals["umsatz"] = float(sum(r[7] for r in rows))
             totals["kosten"] = float(sum(r[8] for r in rows))
@@ -134,160 +138,130 @@ def index():
 
     return render_template("dashboard.html", rows=rows, totals=totals, title="Dashboard")
 
-
 @app.get("/dashboard")
 @login_required
 def dashboard_alias():
     return redirect(url_for("index"))
 
-# ─ Звіт: продажі по днях з фільтрами дат + кілька клієнтів + кілька товарів ─
-# --- ЗАМІНИ МАРШРУТ /reports/daily ЦИМ ВАРІАНТОМ ---
-
-from datetime import date, timedelta
-from flask import request, render_template
-from .db import get_conn
-
+# ─ Звіт: продажі (з фільтрами) ─
 @app.get("/reports/daily")
 @login_required
 def report_daily():
     """
-    Звіт 'Umsatz pro Tag' з фільтрами:
-    - період дат (von..bis)
-    - мультивибір клієнтів/артикулів
-    - деталізація: Tag / Monat / Jahr
-    Дані беремо з v_sales (detail), фільтруємо й агрегуємо на льоту.
+    Фільтри: період дат, кілька клієнтів, кілька артикулів, деталізація Tag/Monat/Jahr.
+    ВАЖЛИВО: для DATE_FORMAT використовуємо '%%Y-%%m' (подвійні %) — інакше Python
+    подумає, що це свій форматер і впаде з помилкою 'unsupported format character'.
     """
-
-    # 1) читаємо параметри або ставимо дефолт
+    # 1) зчитуємо фільтри з GET
     bis = request.args.get("bis") or date.today().isoformat()
     von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
-    group = request.args.get("group") or "tag"   # 'tag' | 'monat' | 'jahr'
+    group = (request.args.get("group") or "tag").lower()   # tag | monat | jahr
 
-    # 2) мультивибір (списки id як інти)
+    # мультивибір -> список int
     kunden_ids = [int(x) for x in request.args.getlist("kunden") if x.strip().isdigit()]
     artikel_ids = [int(x) for x in request.args.getlist("artikel") if x.strip().isdigit()]
 
-    # 3) конструюємо WHERE (фільтри)
-    where_sql = ["verkaufsdatum BETWEEN %s AND %s"]
-    params = [von, bis]
-
-    if kunden_ids:
-        where_sql.append("kundenID IN (" + ",".join(["%s"] * len(kunden_ids)) + ")")
-        params.extend(kunden_ids)
-
-    if artikel_ids:
-        where_sql.append("artikelID IN (" + ",".join(["%s"] * len(artikel_ids)) + ")")
-        params.extend(artikel_ids)
-
-    where_sql = " WHERE " + " AND ".join(where_sql)
-
-    # 4) вибираємо ключ групування
-    #    (щоб не лізти в VIEW — просто формат дати міняємо у SELECT)
+    # 2) мапа для групування
     if group == "monat":
-        # YYYY-MM для місяців
-        tag_expr = "DATE_FORMAT(verkaufsdatum, '%Y-%m')"
-        order_expr = "DATE_FORMAT(verkaufsdatum, '%Y-%m')"
+        # подвійні % у форматі !
+        grp_sql = "DATE_FORMAT(verkaufsdatum, '%%Y-%%m')"
     elif group == "jahr":
-        # YYYY для років
-        tag_expr = "DATE_FORMAT(verkaufsdatum, '%Y')"
-        order_expr = "DATE_FORMAT(verkaufsdatum, '%Y')"
+        grp_sql = "YEAR(verkaufsdatum)"
     else:
-        # за днями (за замовчуванням)
-        tag_expr = "DATE(verkaufsdatum)"
-        order_expr = "DATE(verkaufsdatum)"
+        grp_sql = "DATE(verkaufsdatum)"  # tag
 
     rows = []
-    kunden_list = []
-    artikel_list = []
+    totals = {}
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
+            # 3) базовий WHERE + параметри
+            where_sql = "verkaufsdatum BETWEEN %s AND %s"
+            params = [von, bis]
 
-            # 5) Агрегація (нетто/брутто, кількість, маржа…)
+            # фільтр клієнтів (id з v_sales.kundenID)
+            if kunden_ids:
+                placeholders = ",".join(["%s"] * len(kunden_ids))
+                where_sql += f" AND kundenID IN ({placeholders})"
+                params.extend(kunden_ids)
+
+            # фільтр артикулів (id з v_sales.artikelID)
+            if artikel_ids:
+                placeholders = ",".join(["%s"] * len(artikel_ids))
+                where_sql += f" AND artikelID IN ({placeholders})"
+                params.extend(artikel_ids)
+
+            # 4) агрегуємо з v_sales по вибраній групі
             cur.execute(
                 f"""
                 SELECT
-                    {tag_expr}                                   AS tag,          -- день/місяць/рік
-                    COUNT(*)                                     AS positionen,   -- рядків продажу
-                    SUM(menge)                                   AS menge,
-                    ROUND(SUM(rabatt_eur), 2)                    AS rabatt_eur,
-                    ROUND(SUM(umsatz), 2)                        AS umsatz,       -- нетто (зі знижкою)
-                    ROUND(SUM(kosten), 2)                        AS kosten,
-                    ROUND(SUM(marge), 2)                         AS marge,        -- нетто
-                    ROUND(SUM(umsatz_brutto), 2)                 AS umsatz_brutto,
-                    ROUND(SUM(marge_brutto), 2)                  AS marge_brutto,
-                    ROUND(100 * SUM(marge)        / NULLIF(SUM(umsatz), 0), 2)    AS marge_prozent,
+                    {grp_sql}                                       AS tag,           -- мітка групи
+                    COUNT(*)                                        AS positionen,    -- рядків продажу
+                    SUM(menge)                                      AS menge,         -- шт
+                    ROUND(SUM(rabatt_eur), 2)                       AS rabatt_eur,    -- знижка €
+                    ROUND(SUM(umsatz), 2)                           AS umsatz,        -- виручка NETTO
+                    ROUND(SUM(kosten), 2)                           AS kosten,        -- собівартість
+                    ROUND(SUM(marge), 2)                            AS marge,         -- маржа NETTO
+                    ROUND(SUM(umsatz_brutto), 2)                    AS umsatz_brutto, -- BRUTTO
+                    ROUND(SUM(marge_brutto), 2)                     AS marge_brutto,  -- маржа BRUTTO
+                    ROUND(100 * SUM(marge) / NULLIF(SUM(umsatz), 0), 2)        AS marge_prozent,
                     ROUND(100 * SUM(marge_brutto) / NULLIF(SUM(umsatz_brutto), 0), 2) AS marge_brutto_prozent
                 FROM v_sales
-                {where_sql}
-                GROUP BY {order_expr}
-                ORDER BY {order_expr}
+                WHERE {where_sql}
+                GROUP BY tag
+                ORDER BY tag
                 """,
-                params
+                params,
             )
             rows = cur.fetchall()
 
-            # 6) Довідники для селектів у формі
-            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) FROM kunden ORDER BY nachname, vorname")
-            kunden_list = cur.fetchall()       # [(id, name), ...]
+            # для селектів у формі (показати опції і зберігати вибір)
+            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS name FROM kunden ORDER BY name")
+            kunden_list = cur.fetchall()  # [(id, name), ...]
 
             cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname")
-            artikel_list = cur.fetchall()      # [(id, name), ...]
+            artikel_list = cur.fetchall()  # [(id, name), ...]
 
         conn.close()
 
-    # 7) Підсумки (для футера) + дві відсоткові маржі по формулах від сум
-    totals = {}
-    if rows:
-        totals = {
-            "positionen": sum(r[1] for r in rows),
-            "menge":      float(sum(r[2] for r in rows)),
-            "rabatt_eur": float(sum(r[3] for r in rows)),
-            "umsatz":     float(sum(r[4] for r in rows)),
-            "kosten":     float(sum(r[5] for r in rows)),
-            "marge":      float(sum(r[6] for r in rows)),
-            "umsatz_br":  float(sum(r[7] for r in rows)),
-            "marge_br":   float(sum(r[8] for r in rows)),
-        }
-        # ► Вимога 3: відсотки як ділення підсумкових сум
-        totals["marge_pct"]     = round(100 * totals["marge"]    / totals["umsatz"],    2) if totals["umsatz"] else 0.0
-        totals["marge_br_pct"]  = round(100 * totals["marge_br"] / totals["umsatz_br"], 2) if totals["umsatz_br"] else 0.0
-    else:
-        totals = {"positionen": 0, "menge": 0.0, "rabatt_eur": 0.0,
-                  "umsatz": 0.0, "kosten": 0.0, "marge": 0.0,
-                  "umsatz_br": 0.0, "marge_br": 0.0,
-                  "marge_pct": 0.0, "marge_br_pct": 0.0}
+        # 5) підсумки для футера
+        if rows:
+            totals = {
+                "positionen": sum(r[1] for r in rows),
+                "menge":      float(sum(r[2] for r in rows)),
+                "rabatt_eur": float(sum(r[3] for r in rows)),
+                "umsatz":     float(sum(r[4] for r in rows)),
+                "kosten":     float(sum(r[5] for r in rows)),
+                "marge":      float(sum(r[6] for r in rows)),
+                "umsatz_br":  float(sum(r[7] for r in rows)),
+                "marge_br":   float(sum(r[8] for r in rows)),
+            }
+            # агрегований % від суми (а не середнє)
+            totals["marge_pct"] = round(100.0 * totals["marge"] / totals["umsatz"], 2) if totals["umsatz"] else 0.0
+            totals["marge_br_pct"] = round(100.0 * totals["marge_br"] / totals["umsatz_br"], 2) if totals["umsatz_br"] else 0.0
+        else:
+            totals = {k: 0 for k in ("positionen","menge","rabatt_eur","umsatz","kosten","marge","umsatz_br","marge_br")}
+            totals["marge_pct"] = 0.0
+            totals["marge_br_pct"] = 0.0
 
-    # 8) Для зручності — що користувач вибрав (щоб залишалось у формі)
-    selected_kunden = set(kunden_ids)
-    selected_artikel = set(artikel_ids)
-
+    # 6) рендеримо шаблон
     return render_template(
         "reports_daily.html",
-        title=(
-            "Umsatz pro Tag" if group == "tag"
-            else "Umsatz pro Monat" if group == "monat"
-            else "Umsatz pro Jahr"
-        ),
+        title="Umsatz pro Tag",
         rows=rows,
         totals=totals,
-        von=von,
-        bis=bis,
+        von=von, bis=bis,
         group=group,
         kunden_list=kunden_list,
         artikel_list=artikel_list,
-        selected_kunden=selected_kunden,
-        selected_artikel=selected_artikel
+        selected_kunden=kunden_ids,
+        selected_artikel=artikel_ids,
     )
 
-
-# ─ Health check ─
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-
 if __name__ == "__main__":
-    # слухаємо всі інтерфейси, щоб відкривати з ноутбука
     app.run(host="0.0.0.0", port=5000, debug=True)
