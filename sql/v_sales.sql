@@ -15,13 +15,14 @@ SELECT
     COALESCE(a.durchschnittskosten, 0)                     AS ek_preis,       
 
 
-    ROUND(va.verkaufsmenge * va.verkaufspreis * COALESCE(va.rabatt,0) / 100, 2)                                     AS rabatt_eur,
-    ROUND(va.verkaufsmenge * va.verkaufspreis * (1 - COALESCE(va.rabatt,0) / 100), 2)                                AS umsatz,
-    ROUND(va.verkaufsmenge * COALESCE(a.durchschnittskosten, 0), 2)                                                  AS kosten,
+    ROUND(va.verkaufsmenge * va.verkaufspreis * COALESCE(va.rabatt,0) / 100, 2)                 AS rabatt_eur,
+    ROUND(va.verkaufsmenge * va.verkaufspreis * (1 - COALESCE(va.rabatt,0) / 100), 2)           AS umsatz,
+	ROUND(va.verkaufsmenge * va.verkaufspreis, 2)            									AS umsatz_brutto,
+    ROUND(va.verkaufsmenge * COALESCE(a.durchschnittskosten, 0), 2)                             AS kosten,
     ROUND( (va.verkaufsmenge * va.verkaufspreis * (1 - COALESCE(va.rabatt,0)/100))
-         - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0)), 2)                                                AS marge,
+         - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0)), 2)                           AS marge,
     ROUND( (va.verkaufsmenge * va.verkaufspreis)
-         - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0)), 2)                                                AS marge_brutto,
+         - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0)), 2)                           AS marge_brutto,
 
 
     ROUND(
@@ -29,14 +30,14 @@ SELECT
             (va.verkaufsmenge * va.verkaufspreis * (1 - COALESCE(va.rabatt,0)/100))
           - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0))
         ) / NULLIF(va.verkaufsmenge * va.verkaufspreis * (1 - COALESCE(va.rabatt,0)/100), 0)
-    , 2) AS marge_prozent,
+    , 2) 						AS marge_prozent,
 
     ROUND(
         100 * (
             (va.verkaufsmenge * va.verkaufspreis)
           - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0))
         ) / NULLIF(va.verkaufsmenge * va.verkaufspreis, 0)
-    , 2) AS marge_brutto_prozent
+    , 2) 							AS marge_brutto_prozent
 
 FROM verkauf v
 JOIN verkaufartikel  va ON v.verkaufID   = va.verkaufID

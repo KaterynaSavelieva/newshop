@@ -10,13 +10,12 @@ JOIN artikel ON artikel.artikelID=einkaufartikel.artikelID
 JOIN lieferanten ON lieferanten.lieferantID=einkauf.lieferantID
 -- WHERE einkauf.lieferantID=10
 -- 
-WHERE einkaufartikel.artikelID=24
+WHERE einkaufartikel.artikelID=8
 
 ORDER BY einkaufartikel.einkaufID DESC;
 
 
 
--- 
-UPDATE einkauf SET einkaufsdatum = '2025-08-31 10:00:00' WHERE einkaufID =8 ;
+-- UPDATE einkauf SET einkaufsdatum = '2025-07-27 10:00:00' WHERE einkaufID =45
 
 
