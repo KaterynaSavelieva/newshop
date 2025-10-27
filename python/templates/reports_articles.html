@@ -18,6 +18,12 @@
     .filters .card {
         min-height: 270px;
     }
+
+    .action-bar {
+        position: sticky;
+        top: 8px;
+        z-index: 2;
+    }
 </style>
 
 <h3 class="mb-3">Umsatz pro Artikel{% if grp!='items' %} – {{ 'Tag' if grp=='day' else ('Monat' if grp=='month' else 'Jahr') }}{% endif %}</h3>
@@ -50,13 +56,13 @@
             </div>
         </div>
 
-        <div class="col-md-2">
-            <label class="form-label">Top N</label>
-            <input class="form-control" type="number" name="top" min="5" max="100" value="{{ top_n }}">
+        <div class="col-md-2 d-flex align-items-end justify-content-end gap-2 action-bar">
+            <button class="btn btn-primary" type="submit">Filtern</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('report_articles') }}">Zurücksetzen</a>
         </div>
     </div>
 
-    <!-- ТРИ селекти в один ряд -->
+    <!-- ТРИ селекти -->
     <div class="row g-3">
         <div class="col-md-4">
             <div class="card">
@@ -99,6 +105,11 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-primary" type="submit">Filtern</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('report_articles') }}">Zurücksetzen</a>
     </div>
 </form>
 
@@ -163,7 +174,7 @@
             {% for r in rows %}
             <tr>
                 <td>{{ loop.index }}</td>
-                <td>{{ r[0] }}</td>  {# label: день/місяць/рік #}
+                <td>{{ r[0] }}</td>
                 <td>{{ r[1] }}</td>
                 <td>{{ '%.0f'|format(r[2]) }}</td>
                 <td>{{ '%.2f'|format(r[3]) }}</td>
@@ -194,16 +205,15 @@
 
 <script>
   const mode = "{{ grp }}";
-
   let labels, umsatz, margeEuro, margePct;
 
   {% if grp == 'items' %}
-    labels    = {{ rows|map(attribute=1)|list|tojson }};  // Artikel
+    labels    = {{ rows|map(attribute=1)|list|tojson }};
     umsatz    = {{ rows|map(attribute=4)|list|tojson }};
     margeEuro = {{ rows|map(attribute=6)|list|tojson }};
     margePct  = {{ rows|map(attribute=7)|list|tojson }};
   {% else %}
-    labels    = {{ rows|map(attribute=0)|list|tojson }};  // Tag/Monat/Jahr
+    labels    = {{ rows|map(attribute=0)|list|tojson }};
     umsatz    = {{ rows|map(attribute=3)|list|tojson }};
     margeEuro = {{ rows|map(attribute=5)|list|tojson }};
     margePct  = {{ rows|map(attribute=6)|list|tojson }};
@@ -224,10 +234,16 @@
       scales:{
         yEur:{ position:'left', beginAtZero:true, title:{display:true,text:'€'} },
         yPct:{ position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:'%'} },
-        x:{ ticks:{ autoSkip: (mode==='items' ? false : true), maxRotation:45 } }
+        x:{ ticks:{ autoSkip:(mode==='items'? false:true), maxRotation:45 } }
       },
       plugins:{ legend:{ display:true } }
     }
+  });
+
+  // Клавіші: Ctrl+Enter = фільтр, Escape = скинути
+  document.addEventListener('keydown',(e)=>{
+    if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ document.querySelector('form.filters').submit(); }
+    if(e.key==='Escape'){ window.location="{{ url_for('report_articles') }}"; }
   });
 </script>
 
