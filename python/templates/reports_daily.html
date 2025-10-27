@@ -41,12 +41,16 @@
         <div class="col-md-4">
             <label class="form-label d-block">Intervall</label>
             <div class="btn-group" role="group">
-                <input class="btn-check" type="radio" name="grp" id="g1" value="day" {% if grp= ='day' %}checked{% endif %}>
+
+                <input class="btn-check" type="radio" name="grp" id="g1" value="day" {{ 'checked' if grp == 'day' else '' }}>
                 <label class="btn btn-outline-primary" for="g1">Tag</label>
-                <input class="btn-check" type="radio" name="grp" id="g2" value="month" {% if grp= ='month' %}checked{% endif %}>
+
+                <input class="btn-check" type="radio" name="grp" id="g2" value="month" {{ 'checked' if grp == 'month' else '' }}>
                 <label class="btn btn-outline-primary" for="g2">Monat</label>
-                <input class="btn-check" type="radio" name="grp" id="g3" value="year" {% if grp= ='year' %}checked{% endif %}>
+
+                <input class="btn-check" type="radio" name="grp" id="g3" value="year" {{ 'checked' if grp == 'year' else '' }}>
                 <label class="btn btn-outline-primary" for="g3">Jahr</label>
+
             </div>
         </div>
 
