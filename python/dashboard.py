@@ -203,13 +203,13 @@ def report_daily():
             rows = cur.fetchall()
 
             # 4) довідники для списків (щоб показати та зберегти вибір)
-            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) FROM kunden ORDER BY name")
+            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
             kunden_list = cur.fetchall()
 
-            cur.execute("SELECT kundentypID, bezeichnung FROM kundentyp ORDER BY bezeichnung")
+            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
             kundentyp_list = cur.fetchall()
 
-            cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname")
+            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
             artikel_list = cur.fetchall()
 
         conn.close()
