@@ -1,46 +1,32 @@
 {# templates/login.html #}
 {% extends "base.html" %}
-
 {% block title %}Anmelden{% endblock %}
-
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 70vh;">
-  <div class="card shadow-sm" style="width: 360px;">
-    <div class="card-body">
-      <h4 class="card-title text-center mb-3">Anmeldung</h4>
-      <p class="text-muted text-center mb-4">Bitte geben Sie Ihre Zugangsdaten ein.</p>
-
-      {# ───── Форма входу ───── #}
-      <form method="post" action="{{ url_for('login') }}">
-        <div class="mb-3">
-          <label for="email" class="form-label">E-Mail-Adresse</label>
-          <input type="email" class="form-control" id="email" name="email"
-                 placeholder="name@example.com" required autofocus>
+<div class="d-flex justify-content-center align-items-center" style="min-height:70vh;">
+    <div class="card shadow-sm" style="width:360px;">
+        <div class="card-body">
+            <h4 class="card-title text-center mb-3">Anmeldung</h4>
+            <p class="text-muted text-center mb-4">Bitte geben Sie Ihre Zugangsdaten ein.</p>
+            <form method="post" action="{{ url_for('login') }}">
+                <div class="mb-3">
+                    <label class="form-label">E-Mail-Adresse</label>
+                    <input class="form-control" type="email" name="email" placeholder="name@example.com" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Passwort</label>
+                    <input class="form-control" type="password" name="password" placeholder="********" required>
+                </div>
+                {% if error %}
+                <div class="alert alert-danger py-2 small">{{ error }}</div>
+                {% endif %}
+                <div class="d-grid mt-3">
+                    <button class="btn btn-primary" type="submit">Anmelden</button>
+                </div>
+            </form>
         </div>
-
-        <div class="mb-3">
-          <label for="password" class="form-label">Passwort</label>
-          <input type="password" class="form-control" id="password" name="password"
-                 placeholder="********" required>
+        <div class="card-footer text-center small text-muted">
+            Demo: <code>user@example.com / demo123</code>
         </div>
-
-        {# якщо помилка логіну — показуємо червоне повідомлення #}
-        {% if error %}
-          <div class="alert alert-danger py-2 small" role="alert">
-            {{ error }}
-          </div>
-        {% endif %}
-
-        <div class="d-grid mt-4">
-          <button type="submit" class="btn btn-primary">Anmelden</button>
-        </div>
-      </form>
     </div>
-
-    {# нижній блок картки #}
-    <div class="card-footer text-center small text-muted">
-      <span>Demo-Zugang:</span> <code>user@example.com / demo123</code>
-    </div>
-  </div>
 </div>
 {% endblock %}

@@ -147,42 +147,59 @@ def dashboard_alias():
 @app.get("/reports/daily")
 @login_required
 def report_daily():
-    # 1) зчитуємо параметри
+    # Параметри
     bis = request.args.get("bis") or date.today().isoformat()
     von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+    grp = request.args.get("grp", "day")  # day | month | year
 
-    # мультивибір -> масив рядків (ID у query string): &kunden=1&kunden=3 ...
-    kunden_sel     = request.args.getlist("kunden")       # наприклад ['17','23']
-    artikel_sel    = request.args.getlist("artikel")
-    kundentyp_sel  = request.args.getlist("kundentypen")
+    kunden_sel    = request.args.getlist("kunden")
+    artikel_sel   = request.args.getlist("artikel")
+    kundentyp_sel = request.args.getlist("kundentypen")
 
     rows = []
     totals = {}
+    filter_line = ""
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            # 2) WHERE для v_sales (фільтруємо джерело, а вже потім агрегуємо по днях)
+            # довідники (списки)
+            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
+            kunden_list = cur.fetchall()  # [(id, label), ...]
+
+            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
+            kundentyp_list = cur.fetchall()
+
+            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
+            artikel_list = cur.fetchall()
+
+            # WHERE
             where_sql = "verkaufsdatum BETWEEN %s AND %s"
             params = [von, bis]
 
             if kunden_sel:
                 where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
                 params.extend(kunden_sel)
-
             if kundentyp_sel:
                 where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
                 params.extend(kundentyp_sel)
-
             if artikel_sel:
                 where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
                 params.extend(artikel_sel)
 
-            # 3) Агрегуємо по днях з уже відфільтрованого v_sales
+            # Групування
+            if grp == "month":
+                label_expr = "DATE_FORMAT(verkaufsdatum, '%Y-%m')"
+            elif grp == "year":
+                label_expr = "DATE_FORMAT(verkaufsdatum, '%Y')"
+            else:
+                grp = "day"
+                label_expr = "DATE(verkaufsdatum)"
+
             cur.execute(
                 f"""
                 SELECT
-                  DATE(verkaufsdatum)                AS tag,
+                  {label_expr}                        AS tag,
                   COUNT(*)                           AS positionen,
                   SUM(menge)                         AS menge,
                   ROUND(SUM(rabatt_eur), 2)          AS rabatt_eur,
@@ -195,26 +212,16 @@ def report_daily():
                   ROUND(100 * SUM(marge_brutto) / NULLIF(SUM(umsatz_brutto), 0), 2) AS marge_brutto_prozent
                 FROM v_sales
                 WHERE {where_sql}
-                GROUP BY DATE(verkaufsdatum)
-                ORDER BY tag
+                GROUP BY {label_expr}
+                ORDER BY {label_expr}
                 """,
                 params
             )
             rows = cur.fetchall()
 
-            # 4) довідники для списків (щоб показати та зберегти вибір)
-            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
-            kunden_list = cur.fetchall()
-
-            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
-            kundentyp_list = cur.fetchall()
-
-            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
-            artikel_list = cur.fetchall()
-
         conn.close()
 
-    # 5) підсумки для футера
+    # Підсумки
     if rows:
         totals = {
             "positionen": sum(r[1] for r in rows),
@@ -229,20 +236,35 @@ def report_daily():
     else:
         totals = {"positionen":0,"menge":0.0,"rabatt_eur":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0,"umsatz_br":0.0,"marge_br":0.0}
 
-    # 6) віддаємо в шаблон усе необхідне
+    # Рядок «Gefiltert»: точні назви
+    def labels_for(selected_ids, pairs):
+        id_to_label = {str(pid): lbl for pid, lbl in pairs}
+        names = [id_to_label.get(str(x)) for x in selected_ids if str(x) in id_to_label]
+        if not names: return ""
+        if len(names) <= 6:
+            return ", ".join(names)
+        return ", ".join(names[:6]) + f" … (+{len(names)-6})"
+
+    kunden_txt    = labels_for(kunden_sel, kunden_list if 'kunden_list' in locals() else [])
+    kundentyp_txt = labels_for(kundentyp_sel, kundentyp_list if 'kundentyp_list' in locals() else [])
+    artikel_txt   = labels_for(artikel_sel, artikel_list if 'artikel_list' in locals() else [])
+
+    parts = [f"von: {von}", f"bis: {bis}", f"Intervall: {grp}"]
+    if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
+    if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
+    if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
+    filter_line = "Gefiltert → " + " · ".join(parts)
+
     return render_template(
         "reports_daily.html",
-        title="Umsatz pro Tag",
-        rows=rows,
-        totals=totals,
-        von=von,
-        bis=bis,
+        title=f"Umsatz pro {grp}",
+        rows=rows, totals=totals,
+        von=von, bis=bis, grp=grp,
         kunden_list=kunden_list if 'kunden_list' in locals() else [],
         artikel_list=artikel_list if 'artikel_list' in locals() else [],
         kundentyp_list=kundentyp_list if 'kundentyp_list' in locals() else [],
-        kunden_sel=kunden_sel,
-        artikel_sel=artikel_sel,
-        kundentyp_sel=kundentyp_sel,
+        kunden_sel=kunden_sel, artikel_sel=artikel_sel, kundentyp_sel=kundentyp_sel,
+        filter_line=filter_line,
     )
 
 
