@@ -20,7 +20,7 @@
     }
 </style>
 
-<h3 class="mb-3">Umsatz pro Artikel (Top {{ top_n }})</h3>
+<h3 class="mb-3">Umsatz pro Artikel{% if grp!='items' %} – {{ 'Tag' if grp=='day' else ('Monat' if grp=='month' else 'Jahr') }}{% endif %}</h3>
 
 <form class="filters" method="get" action="{{ url_for('report_articles') }}">
     <div class="row g-3 mb-3">
@@ -32,16 +32,31 @@
             <label class="form-label">Bis</label>
             <input class="form-control" type="date" name="bis" value="{{ bis }}">
         </div>
+
+        <div class="col-md-4">
+            <label class="form-label d-block">Intervall</label>
+            <div class="btn-group" role="group">
+                <input class="btn-check" type="radio" name="grp" id="ga" value="items" {{ 'checked' if grp == 'items' else '' }}>
+                <label class="btn btn-outline-primary" for="ga">Artikel (Top N)</label>
+
+                <input class="btn-check" type="radio" name="grp" id="g1" value="day" {{ 'checked' if grp == 'day' else '' }}>
+                <label class="btn btn-outline-primary" for="g1">Tag</label>
+
+                <input class="btn-check" type="radio" name="grp" id="g2" value="month" {{ 'checked' if grp == 'month' else '' }}>
+                <label class="btn btn-outline-primary" for="g2">Monat</label>
+
+                <input class="btn-check" type="radio" name="grp" id="g3" value="year" {{ 'checked' if grp == 'year' else '' }}>
+                <label class="btn btn-outline-primary" for="g3">Jahr</label>
+            </div>
+        </div>
+
         <div class="col-md-2">
             <label class="form-label">Top N</label>
             <input class="form-control" type="number" name="top" min="5" max="100" value="{{ top_n }}">
         </div>
-        <div class="col-md-4 d-flex align-items-end">
-            <button class="btn btn-primary me-2" type="submit">Filtern</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('report_articles') }}">Zurücksetzen</a>
-        </div>
     </div>
 
+    <!-- ТРИ селекти в один ряд -->
     <div class="row g-3">
         <div class="col-md-4">
             <div class="card">
@@ -91,6 +106,10 @@
 <div class="alert alert-light border py-2 mt-3">{{ filter_line|safe }}</div>
 {% endif %}
 
+{% if ts_mode_msg %}
+<div class="alert alert-warning py-2 mt-3">{{ ts_mode_msg }}</div>
+{% endif %}
+
 <div class="card mt-3">
     <div class="card-header py-2">Umsatz – Balken &amp; Marge (%) – Linie</div>
     <div class="card-body">
@@ -101,6 +120,7 @@
 <div class="table-responsive mt-3">
     <table class="table table-sm table-striped table-bordered align-middle">
         <thead class="table-light">
+            {% if grp == 'items' %}
             <tr>
                 <th>#</th>
                 <th>Artikel</th>
@@ -111,8 +131,22 @@
                 <th>Marge (€)</th>
                 <th>Marge (%)</th>
             </tr>
+            {% else %}
+            <tr>
+                <th>#</th>
+                <th>{{ 'Tag' if grp=='day' else ('Monat' if grp=='month' else 'Jahr') }}</th>
+                <th>Positionen</th>
+                <th>Menge</th>
+                <th>Umsatz (€)</th>
+                <th>Kosten (€)</th>
+                <th>Marge (€)</th>
+                <th>Marge (%)</th>
+            </tr>
+            {% endif %}
         </thead>
+
         <tbody>
+            {% if grp == 'items' %}
             {% for r in rows %}
             <tr>
                 <td>{{ loop.index }}</td>
@@ -125,7 +159,22 @@
                 <td>{{ '%.2f'|format(r[7]) }}</td>
             </tr>
             {% endfor %}
+            {% else %}
+            {% for r in rows %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ r[0] }}</td>  {# label: день/місяць/рік #}
+                <td>{{ r[1] }}</td>
+                <td>{{ '%.0f'|format(r[2]) }}</td>
+                <td>{{ '%.2f'|format(r[3]) }}</td>
+                <td>{{ '%.2f'|format(r[4]) }}</td>
+                <td>{{ '%.2f'|format(r[5]) }}</td>
+                <td>{{ '%.2f'|format(r[6]) }}</td>
+            </tr>
+            {% endfor %}
+            {% endif %}
         </tbody>
+
         <tfoot class="table-light">
             <tr>
                 <th colspan="2">Summe</th>
@@ -144,28 +193,42 @@
 </div>
 
 <script>
-const labels={{ rows|map(attribute=1)|list|tojson }};
-const umsatz={{ rows|map(attribute=4)|list|tojson }};
-    const marge€ = {{ rows|map(attribute = 6) | list | tojson }};
-const marge = {{ rows| map(attribute = 7) | list | tojson }};
+  const mode = "{{ grp }}";
 
-new Chart(document.getElementById('artChart'),{
-  type:'bar',
-  data:{labels,datasets:[
-      { type: 'bar', label: 'Umsatz (€)', data: umsatz, yAxisID: 'yEur', borderWidth: 1 },
-      { type: 'bar', label: 'Marge (€)', data: marge€, yAxisID: 'yEur', borderWidth: 1},
-      { type: 'line', label: 'Marge (%)', data: marge, yAxisID: 'yPct', borderWidth: 2, fill: false, tension: .25, pointRadius: 2 }
-  ]},
-  options:{
-    responsive:true,maintainAspectRatio:false,
-    scales:{
-      yEur:{position:'left',beginAtZero:true,title:{display:true,text:'€'}},
-      yPct:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'%'}},
-      x:{ticks:{autoSkip:false,maxRotation:45}}
+  let labels, umsatz, margeEuro, margePct;
+
+  {% if grp == 'items' %}
+    labels    = {{ rows|map(attribute=1)|list|tojson }};  // Artikel
+    umsatz    = {{ rows|map(attribute=4)|list|tojson }};
+    margeEuro = {{ rows|map(attribute=6)|list|tojson }};
+    margePct  = {{ rows|map(attribute=7)|list|tojson }};
+  {% else %}
+    labels    = {{ rows|map(attribute=0)|list|tojson }};  // Tag/Monat/Jahr
+    umsatz    = {{ rows|map(attribute=3)|list|tojson }};
+    margeEuro = {{ rows|map(attribute=5)|list|tojson }};
+    margePct  = {{ rows|map(attribute=6)|list|tojson }};
+  {% endif %}
+
+  new Chart(document.getElementById('artChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { type:'bar',  label:'Umsatz (€)', data: umsatz,    yAxisID:'yEur', borderWidth:1 },
+        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },
+        { type:'line', label:'Marge (%)',  data: margePct,  yAxisID:'yPct', borderWidth:2, fill:false, tension:.25, pointRadius:2 }
+      ]
     },
-    plugins:{legend:{display:true}}
-  }
-});
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        yEur:{ position:'left', beginAtZero:true, title:{display:true,text:'€'} },
+        yPct:{ position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:'%'} },
+        x:{ ticks:{ autoSkip: (mode==='items' ? false : true), maxRotation:45 } }
+      },
+      plugins:{ legend:{ display:true } }
+    }
+  });
 </script>
 
 {% endblock %}

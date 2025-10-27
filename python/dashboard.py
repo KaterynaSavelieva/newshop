@@ -397,6 +397,7 @@ def report_articles():
     artikel_sel   = request.args.getlist("artikel")
     kunden_sel    = request.args.getlist("kunden")
     kundentyp_sel = request.args.getlist("kundentypen")
+    grp = request.args.get("grp", "items")  # items | day | month | year
 
     try:
         top_n = int(request.args.get("top", "20"))
@@ -407,24 +408,22 @@ def report_articles():
     rows = []
     totals = {}
     filter_line = ""
+    ts_mode_msg = None   # повідомлення, якщо часовий режим неможливий
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            # Довідники для селектів
+            # Довідники
             cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname")
             artikel_list = cur.fetchall()
-
             cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) FROM kunden ORDER BY 2")
             kunden_list = cur.fetchall()
-
             cur.execute("SELECT kundentypID, bezeichnung FROM kundentyp ORDER BY bezeichnung")
             kundentyp_list = cur.fetchall()
 
             # WHERE
             where_sql = "verkaufsdatum BETWEEN %s AND %s"
             params = [von, bis]
-
             if artikel_sel:
                 where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
                 params.extend(artikel_sel)
@@ -435,39 +434,82 @@ def report_articles():
                 where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
                 params.extend(kundentyp_sel)
 
-            # Основний запит
-            sql = f"""
-                SELECT
-                  artikelID,
-                  artikel,
-                  COUNT(*)              AS positionen,
-                  SUM(menge)            AS menge,
-                  ROUND(SUM(umsatz),2)  AS umsatz,
-                  ROUND(SUM(kosten),2)  AS kosten,
-                  ROUND(SUM(marge),2)   AS marge,
-                  ROUND(100*SUM(marge)/NULLIF(SUM(umsatz),0),2) AS marge_prozent
-                FROM v_sales
-                WHERE {where_sql}
-                GROUP BY artikelID, artikel
-                ORDER BY umsatz DESC
-                LIMIT {top_n}
-            """
-            cur.execute(sql, params)
-            rows = cur.fetchall()
+            if grp == "items":
+                # ---- звичайний Top-N по артикулах ----
+                sql = f"""
+                    SELECT
+                      artikelID,
+                      artikel,
+                      COUNT(*)              AS positionen,
+                      SUM(menge)            AS menge,
+                      ROUND(SUM(umsatz),2)  AS umsatz,
+                      ROUND(SUM(kosten),2)  AS kosten,
+                      ROUND(SUM(marge),2)   AS marge,
+                      ROUND(100*SUM(marge)/NULLIF(SUM(umsatz),0),2) AS marge_prozent
+                    FROM v_sales
+                    WHERE {where_sql}
+                    GROUP BY artikelID, artikel
+                    ORDER BY umsatz DESC
+                    LIMIT {top_n}
+                """
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+
+            else:
+                # ---- часовий ряд для 1 вибраного артикула ----
+                if len(artikel_sel) != 1:
+                    ts_mode_msg = "Bitte genau einen Artikel wählen, um einen Zeitverlauf anzuzeigen."
+                else:
+                    if grp == "month":
+                        label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y-%%m')"
+                    elif grp == "year":
+                        label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y')"
+                    else:
+                        grp = "day"
+                        label_expr = "DATE(verkaufsdatum)"
+
+                    sql = f"""
+                        SELECT
+                          {label_expr}                       AS label,
+                          COUNT(*)                           AS positionen,
+                          SUM(menge)                         AS menge,
+                          ROUND(SUM(umsatz),2)               AS umsatz,
+                          ROUND(SUM(kosten),2)               AS kosten,
+                          ROUND(SUM(marge),2)                AS marge,
+                          ROUND(100*SUM(marge)/NULLIF(SUM(umsatz),0),2) AS marge_prozent
+                        FROM v_sales
+                        WHERE {where_sql}
+                          AND artikelID = %s
+                        GROUP BY label
+                        ORDER BY label
+                    """
+                    params_ts = params + [artikel_sel[0]]
+                    cur.execute(sql, params_ts)
+                    rows = cur.fetchall()
+
         conn.close()
 
+    # Підсумки (ті самі поля, але різні індекси для items vs ts не потрібні — ми узгодили колонки)
     if rows:
+        # для items: rows = [id, name, pos, menge, umsatz, kosten, marge, marge%]
+        # для ts:    rows = [label, pos, menge, umsatz, kosten, marge, marge%]
+        pos_idx = 2 if grp == "items" else 1
+        menge_idx = 3 if grp == "items" else 2
+        umsatz_idx = 4 if grp == "items" else 3
+        kosten_idx = 5 if grp == "items" else 4
+        marge_idx  = 6 if grp == "items" else 5
+
         totals = {
-            "positionen": sum(r[2] for r in rows),
-            "menge":      float(sum(r[3] for r in rows)),
-            "umsatz":     float(sum(r[4] for r in rows)),
-            "kosten":     float(sum(r[5] for r in rows)),
-            "marge":      float(sum(r[6] for r in rows)),
+            "positionen": sum(r[pos_idx] for r in rows),
+            "menge":      float(sum(r[menge_idx] for r in rows)),
+            "umsatz":     float(sum(r[umsatz_idx] for r in rows)),
+            "kosten":     float(sum(r[kosten_idx] for r in rows)),
+            "marge":      float(sum(r[marge_idx]  for r in rows)),
         }
     else:
         totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
 
-    # текст фільтра
+    # Рядок фільтра
     def labels_for(selected, pairs):
         m={str(i):n for i,n in pairs}
         names=[m.get(str(x)) for x in selected if str(x) in m]
@@ -479,7 +521,7 @@ def report_articles():
     kunden_txt    = labels_for(kunden_sel, kunden_list if 'kunden_list' in locals() else [])
     kundentyp_txt = labels_for(kundentyp_sel, kundentyp_list if 'kundentyp_list' in locals() else [])
 
-    parts=[f"von: {von}", f"bis: {bis}", f"Top: {top_n}"]
+    parts=[f"von: {von}", f"bis: {bis}", f"Modus: {'Artikel' if grp=='items' else grp}"]
     if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
     if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
     if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
@@ -489,13 +531,14 @@ def report_articles():
         "reports_articles.html",
         title="Umsatz pro Artikel",
         rows=rows, totals=totals,
-        von=von, bis=bis, top_n=top_n,
+        von=von, bis=bis, top_n=top_n, grp=grp,
         artikel_list=artikel_list if 'artikel_list' in locals() else [],
         kunden_list=kunden_list if 'kunden_list' in locals() else [],
         kundentyp_list=kundentyp_list if 'kundentyp_list' in locals() else [],
         artikel_sel=artikel_sel, kunden_sel=kunden_sel, kundentyp_sel=kundentyp_sel,
-        filter_line=filter_line,
+        filter_line=filter_line, ts_mode_msg=ts_mode_msg,
     )
+
 
 
 @app.get("/health")
