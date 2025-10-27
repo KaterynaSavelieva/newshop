@@ -3,7 +3,7 @@
 
 <h1>{{ title }}</h1>
 
-<!-- 🔹 Фільтр дат -->
+<!-- Фільтр дат -->
 <form method="get" style="margin-bottom: 1em;">
   <label>Von:
     <input type="date" name="von" value="{{ von }}">
@@ -15,30 +15,49 @@
   <a href="{{ url_for('report_daily') }}">Zurücksetzen</a>
 </form>
 
-<!-- 🔹 Графік Umsatz -->
-<section style="margin:18px 0;">
-  <h2 style="margin:0 0 8px 0; font-size:18px;">Umsatz – Diagramm (€/Tag)</h2>
+<!-- Легенда -->
+<div style="display:flex; gap:18px; align-items:center; margin:8px 0 6px 0; font-size:14px;">
+  <span style="display:inline-flex; align-items:center; gap:8px;">
+    <span style="width:12px; height:12px; border-radius:50%; background:#2b7cff; display:inline-block;"></span>
+    Umsatz (€)
+  </span>
+  <span style="display:inline-flex; align-items:center; gap:8px;">
+    <span style="width:12px; height:12px; border-radius:50%; background:#10b981; display:inline-block;"></span>
+    Marge (€)
+  </span>
+</div>
 
+<!-- Графік (SVG, без бібліотек) -->
+<section style="margin:10px 0 18px 0;">
   <div style="border:1px solid #d8d8d8; border-radius:12px; padding:10px; background:#fff;">
-    <svg id="umsatzChart" viewBox="0 0 640 260" width="100%" height="260" preserveAspectRatio="none">
+    <svg id="chart" viewBox="0 0 640 260" width="100%" height="260" preserveAspectRatio="none">
       <defs>
         <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%"  stop-color="#2b7cff" stop-opacity="0.20"/>
           <stop offset="100%" stop-color="#2b7cff" stop-opacity="0.02"/>
         </linearGradient>
       </defs>
+
       <g id="grid"></g>
       <text id="maxLabel" x="46" y="14" fill="#6b7280" font-size="11"></text>
-      <path id="areaPath" d="" fill="url(#areaFill)" stroke="none"></path>
-      <path id="linePath" d="" fill="none" stroke="#2b7cff" stroke-width="2.2"></path>
-      <g id="dots"></g>
+
+      <!-- Площа тільки для Umsatz -->
+      <path id="areaU"  d="" fill="url(#areaFill)" stroke="none"></path>
+
+      <!-- Лінії -->
+      <path id="lineU" d="" fill="none" stroke="#2b7cff" stroke-width="2.2"></path>
+      <path id="lineM" d="" fill="none" stroke="#10b981" stroke-width="2.2"></path>
+
+      <!-- Точки -->
+      <g id="dotsU"></g>
+      <g id="dotsM"></g>
     </svg>
 
     <div id="xTicks" style="display:flex; gap:10px; margin:6px 0 0 46px; flex-wrap:wrap; font-size:11px; color:#6b7280;"></div>
   </div>
 </section>
 
-<!-- 🔹 Таблиця продажів по днях -->
+<!-- Таблиця -->
 <table border="1" cellspacing="0" cellpadding="4" style="border-collapse: collapse; width:100%; font-size:14px;">
   <thead style="background:#f4f4f4;">
     <tr>
@@ -88,10 +107,13 @@
   </tfoot>
 </table>
 
-<!-- 🔹 Графік JS -->
+<!-- JS для графіка -->
 <script>
+  // Дані з Flask (індекси: 4 = Umsatz, 6 = Marge)
   const datesRaw = {{ rows|map(attribute=0)|list|tojson }};
-  const values   = {{ rows|map(attribute=4)|list|tojson }};
+  const valuesU  = {{ rows|map(attribute=4)|list|tojson }};
+  const valuesM  = {{ rows|map(attribute=6)|list|tojson }};
+
   const fmtDate = s => {
     const d = new Date(s);
     if (!isNaN(d)) {
@@ -102,78 +124,116 @@
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
     return m ? `${m[3]}.${m[2]}` : s;
   };
+
+  // Розміри полотна
   const W=640,H=260,L=46,R=10,T=20,B=26;
-  const innerW=W-L-R,innerH=H-T-B;
-  const maxValRaw=Math.max(1,...values);
-  const pow=Math.pow(10,Math.max(0,String(Math.floor(maxValRaw)).length-1));
-  const yMax=Math.ceil(maxValRaw/pow)*pow;
-  document.getElementById('maxLabel').textContent=`max ≈ € ${yMax.toFixed(0)}`;
-  const n=values.length;
-  const stepX=n>1?innerW/(n-1):0;
-  const quadPath=pts=>{
-    if(pts.length===0)return'';
-    if(pts.length===1)return`M ${pts[0][0]} ${pts[0][1]}`;
-    let d=`M ${pts[0][0]} ${pts[0][1]}`;
-    for(let i=1;i<pts.length;i++){
-      const[x0,y0]=pts[i-1];const[x1,y1]=pts[i];
-      const cx=(x0+x1)/2,cy=(y0+y1)/2;
-      d+=` Q ${x0} ${y0}, ${cx} ${cy}`;
-    }
-    const[xe,ye]=pts[pts.length-1];d+=` T ${xe} ${ye}`;return d;
-  };
-  const pts=values.map((v,i)=>{
-    const x=L+stepX*i;
-    const y=T+innerH*(1-(v/yMax));
-    return[x,y];
+  const innerW=W-L-R, innerH=H-T-B;
+
+  const maxU = Math.max(1, ...valuesU);
+  const maxM = Math.max(1, ...valuesM);
+  const maxValRaw = Math.max(maxU, maxM);
+
+  // Скругляємо верх межі Y красиво
+  const pow = Math.pow(10, Math.max(0, String(Math.floor(maxValRaw)).length - 1));
+  const yMax = Math.ceil(maxValRaw / pow) * pow;
+
+  document.getElementById('maxLabel').textContent = `max ≈ € ${yMax.toFixed(0)}`;
+
+  const n = valuesU.length;
+  const stepX = n > 1 ? innerW / (n - 1) : 0;
+
+  const toPts = (vals) => vals.map((v,i) => {
+    const x = L + stepX * i;
+    const y = T + innerH * (1 - (v / yMax));
+    return [x,y];
   });
-  const grid=document.getElementById('grid');
-  const gridLines=5;
-  for(let i=0;i<=gridLines;i++){
-    const y=T+innerH*(i/gridLines);
-    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
-    ln.setAttribute('x1',L);ln.setAttribute('x2',W-R);
-    ln.setAttribute('y1',y);ln.setAttribute('y2',y);
-    ln.setAttribute('stroke',i===gridLines?'#d1d5db':'#eee');
+
+  const ptsU = toPts(valuesU);
+  const ptsM = toPts(valuesM);
+
+  // Грід + підписи по Y
+  const grid = document.getElementById('grid');
+  const gridLines = 5;
+  for (let i=0; i<=gridLines; i++) {
+    const y = T + innerH * (i / gridLines);
+    const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1', L); ln.setAttribute('x2', W-R);
+    ln.setAttribute('y1', y); ln.setAttribute('y2', y);
+    ln.setAttribute('stroke', i===gridLines ? '#d1d5db' : '#eee');
     grid.appendChild(ln);
-    if(i<gridLines){
-      const val=((gridLines-i)/gridLines)*yMax;
-      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
-      txt.setAttribute('x',4);txt.setAttribute('y',y+4);
-      txt.setAttribute('fill','#9ca3af');
-      txt.setAttribute('font-size','10');
-      txt.textContent=val.toFixed(0);
+
+    if (i < gridLines) {
+      const val = ((gridLines - i) / gridLines) * yMax;
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x', 4);
+      txt.setAttribute('y', y + 4);
+      txt.setAttribute('fill', '#9ca3af');
+      txt.setAttribute('font-size', '10');
+      txt.textContent = val.toFixed(0);
       grid.appendChild(txt);
     }
   }
-  const lineD=quadPath(pts);
-  document.getElementById('linePath').setAttribute('d',lineD);
-  if(pts.length>1){
-    const areaD=lineD+` L ${pts[pts.length-1][0]} ${T+innerH} L ${pts[0][0]} ${T+innerH} Z`;
-    document.getElementById('areaPath').setAttribute('d',areaD);
+
+  // Згладжена лінія (квадратні Безьє)
+  const quadPath = (pts) => {
+    if (pts.length === 0) return '';
+    if (pts.length === 1) return `M ${pts[0][0]} ${pts[0][1]}`;
+    let d = `M ${pts[0][0]} ${pts[0][1]}`;
+    for (let i=1; i<pts.length; i++) {
+      const [x0,y0] = pts[i-1];
+      const [x1,y1] = pts[i];
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      d += ` Q ${x0} ${y0}, ${cx} ${cy}`;
+    }
+    const [xe,ye] = pts[pts.length-1];
+    d += ` T ${xe} ${ye}`;
+    return d;
+  };
+
+  const lineU = quadPath(ptsU);
+  const lineM = quadPath(ptsM);
+
+  document.getElementById('lineU').setAttribute('d', lineU);
+  document.getElementById('lineM').setAttribute('d', lineM);
+
+  // Площа під Umsatz
+  if (ptsU.length > 1) {
+    const areaD = lineU + ` L ${ptsU[ptsU.length-1][0]} ${T+innerH} L ${ptsU[0][0]} ${T+innerH} Z`;
+    document.getElementById('areaU').setAttribute('d', areaD);
   }
-  const dotsG=document.getElementById('dots');
-  const dates=datesRaw.map(fmtDate);
-  pts.forEach((p,i)=>{
-    const[x,y]=p;
-    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    c.setAttribute('cx',x);
-    c.setAttribute('cy',y);
-    c.setAttribute('r',3.2);
-    c.setAttribute('fill','#2b7cff');
-    c.style.cursor='pointer';
-    const t=document.createElementNS('http://www.w3.org/2000/svg','title');
-    t.textContent=`${dates[i]} • € ${(+values[i]).toFixed(2)}`;
-    c.appendChild(t);
-    c.addEventListener('mouseenter',()=>{c.setAttribute('r',5);c.setAttribute('fill','#ff7f2b');});
-    c.addEventListener('mouseleave',()=>{c.setAttribute('r',3.2);c.setAttribute('fill','#2b7cff');});
-    dotsG.appendChild(c);
-  });
-  const xTicks=document.getElementById('xTicks');
-  const ticks=Math.min(8,dates.length);
-  for(let i=0;i<ticks;i++){
-    const idx=Math.round(i*(dates.length-1)/(ticks-1));
-    const span=document.createElement('span');
-    span.textContent=dates[idx];
+
+  // Точки з тултіпами
+  const addDots = (groupId, pts, vals, color) => {
+    const g = document.getElementById(groupId);
+    const dates = datesRaw.map(fmtDate);
+    pts.forEach((p,i) => {
+      const [x,y] = p;
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', x);
+      c.setAttribute('cy', y);
+      c.setAttribute('r', 3.2);
+      c.setAttribute('fill', color);
+      c.style.cursor = 'pointer';
+      const t = document.createElementNS('http://www.w3.org/2000/svg','title');
+      t.textContent = `${dates[i]} • € ${(+vals[i]).toFixed(2)}`;
+      c.appendChild(t);
+      c.addEventListener('mouseenter', () => { c.setAttribute('r', 5); c.setAttribute('fill', '#ff7f2b'); });
+      c.addEventListener('mouseleave', () => { c.setAttribute('r', 3.2); c.setAttribute('fill', color); });
+      g.appendChild(c);
+    });
+  };
+
+  addDots('dotsU', ptsU, valuesU, '#2b7cff'); // Umsatz
+  addDots('dotsM', ptsM, valuesM, '#10b981'); // Marge
+
+  // Підписи по X (обмежуємо до 8)
+  const xTicks = document.getElementById('xTicks');
+  const dates = datesRaw.map(fmtDate);
+  const ticks = Math.min(8, dates.length);
+  for (let i=0; i<ticks; i++) {
+    const idx = Math.round(i * (dates.length - 1) / (ticks - 1));
+    const span = document.createElement('span');
+    span.textContent = dates[idx];
     xTicks.appendChild(span);
   }
 </script>

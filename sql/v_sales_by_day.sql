@@ -21,6 +21,6 @@ SELECT * FROM v_sales_by_day ORDER BY tag DESC;
 
 SELECT *
 FROM v_sales_by_day
-WHERE tag BETWEEN '2025-10-01' AND '2025-10-31'
+WHERE tag BETWEEN '2024-10-01' AND '2025-10-31'
 ORDER BY tag;
 

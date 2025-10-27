@@ -11,7 +11,7 @@ SELECT
 
     va.verkaufsmenge                                       AS menge,
     va.verkaufspreis                                       AS vk_preis,
-    COALESCE(va.rabatt, 0)                                 AS "rabatt %",      
+    COALESCE(va.rabatt, 0)                                 AS rabatt_prozent,      
     COALESCE(a.durchschnittskosten, 0)                     AS ek_preis,       
 
 
@@ -29,14 +29,14 @@ SELECT
             (va.verkaufsmenge * va.verkaufspreis * (1 - COALESCE(va.rabatt,0)/100))
           - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0))
         ) / NULLIF(va.verkaufsmenge * va.verkaufspreis * (1 - COALESCE(va.rabatt,0)/100), 0)
-    , 2) AS "marge_%",
+    , 2) AS marge_prozent,
 
     ROUND(
         100 * (
             (va.verkaufsmenge * va.verkaufspreis)
           - (va.verkaufsmenge * COALESCE(a.durchschnittskosten,0))
         ) / NULLIF(va.verkaufsmenge * va.verkaufspreis, 0)
-    , 2) AS "marge_brutto_%"
+    , 2) AS marge_brutto_prozent
 
 FROM verkauf v
 JOIN verkaufartikel  va ON v.verkaufID   = va.verkaufID
