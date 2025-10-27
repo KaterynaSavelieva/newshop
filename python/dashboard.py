@@ -325,18 +325,17 @@ def report_customers():
                 SELECT
                   kundenID,
                   kunde,
-                  kundentyp,
-                  COUNT(*) AS positionen,
-                  SUM(menge) AS menge,
-                  ROUND(SUM(umsatz), 2) AS umsatz,
-                  ROUND(SUM(kosten), 2) AS kosten,
-                  /* ✅ правильна маржа: сума продажів - сума витрат */
-                  ROUND(SUM(umsatz) - SUM(kosten), 2) AS marge,
-                  /* ✅ правильний відсоток: margin, не markup */
+                  COUNT(*)                              AS positionen,
+                  SUM(menge)                            AS menge,
+                  ROUND(SUM(umsatz), 2)                 AS umsatz,
+                  ROUND(SUM(kosten), 2)                 AS kosten,
+                  /* правильна маржа: продажі мінус собівартість */
+                  ROUND(SUM(umsatz) - SUM(kosten), 2)   AS marge,
+                  /* margin %, не markup */
                   ROUND(100 * (SUM(umsatz) - SUM(kosten)) / NULLIF(SUM(umsatz), 0), 2) AS marge_prozent
                 FROM v_sales
                 WHERE {where_sql}
-                GROUP BY kundenID, kunde, kundentyp
+                GROUP BY kundenID, kunde
                 ORDER BY umsatz DESC
                 LIMIT {top_n}
             """
