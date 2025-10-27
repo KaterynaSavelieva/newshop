@@ -52,6 +52,11 @@
                         <a class="nav-link {% if 'report' in request.endpoint %}active{% endif %}"
                            href="{{ url_for('report_daily') }}">Umsatz pro Tag</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'report_customers' in request.endpoint %}active{% endif %}"
+                           href="{{ url_for('report_customers') }}">Umsatz pro Kunde</a>
+                    </li>
+
                 </ul>
                 {% if current_user.is_authenticated %}
                 <span class="text-muted small me-3">{{ current_user.name or current_user.email }}</span>

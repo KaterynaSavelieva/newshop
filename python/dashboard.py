@@ -268,6 +268,123 @@ def report_daily():
     )
 
 
+# ─ Звіт: Umsatz pro Kunde ─
+@app.get("/reports/customers")
+@login_required
+def report_customers():
+    from datetime import date, timedelta
+
+    # Параметри
+    bis = request.args.get("bis") or date.today().isoformat()
+    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+
+    kunden_sel    = request.args.getlist("kunden")
+    artikel_sel   = request.args.getlist("artikel")
+    kundentyp_sel = request.args.getlist("kundentypen")
+
+    # top_n (кількість у топі для графіка/таблиці)
+    try:
+        top_n = int(request.args.get("top", "20"))
+    except ValueError:
+        top_n = 20
+    top_n = max(5, min(top_n, 100))  # 5..100
+
+    rows = []
+    filter_line = ""
+    totals = {}
+
+    conn = get_conn()
+    if conn:
+        with conn.cursor() as cur:
+            # довідники
+            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
+            kunden_list = cur.fetchall()
+
+            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
+            kundentyp_list = cur.fetchall()
+
+            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
+            artikel_list = cur.fetchall()
+
+            # WHERE
+            where_sql = "verkaufsdatum BETWEEN %s AND %s"
+            params = [von, bis]
+
+            if kunden_sel:
+                where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
+                params.extend(kunden_sel)
+            if kundentyp_sel:
+                where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
+                params.extend(kundentyp_sel)
+            if artikel_sel:
+                where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
+                params.extend(artikel_sel)
+
+            # Групування по клієнту (зважена маржа %)
+            sql = f"""
+                SELECT
+                  kundenID,
+                  kunde,
+                  kundentyp,
+                  COUNT(*)                    AS positionen,
+                  SUM(menge)                  AS menge,
+                  ROUND(SUM(umsatz), 2)       AS umsatz,
+                  ROUND(SUM(kosten), 2)       AS kosten,
+                  ROUND(SUM(marge),  2)       AS marge,
+                  ROUND(100 * SUM(marge) / NULLIF(SUM(umsatz), 0), 2) AS marge_prozent
+                FROM v_sales
+                WHERE {where_sql}
+                GROUP BY kundenID, kunde, kundentyp
+                ORDER BY umsatz DESC
+                LIMIT {top_n}
+            """
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+        conn.close()
+
+    # Підсумки
+    if rows:
+        totals = {
+            "positionen": sum(r[3] for r in rows),
+            "menge":      float(sum(r[4] for r in rows)),
+            "umsatz":     float(sum(r[5] for r in rows)),
+            "kosten":     float(sum(r[6] for r in rows)),
+            "marge":      float(sum(r[7] for r in rows)),
+        }
+    else:
+        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
+
+    # Рядок “Gefiltert”
+    def labels_for(selected_ids, pairs):
+        m = {str(i): n for i, n in pairs}
+        names = [m.get(str(x)) for x in selected_ids if str(x) in m]
+        if not names: return ""
+        if len(names) <= 6: return ", ".join(names)
+        return ", ".join(names[:6]) + f" … (+{len(names)-6})"
+
+    kunden_txt    = labels_for(kunden_sel, kunden_list if 'kunden_list' in locals() else [])
+    kundentyp_txt = labels_for(kundentyp_sel, kundentyp_list if 'kundentyp_list' in locals() else [])
+    artikel_txt   = labels_for(artikel_sel, artikel_list if 'artikel_list' in locals() else [])
+
+    parts = [f"von: {von}", f"bis: {bis}", f"Top: {top_n}"]
+    if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
+    if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
+    if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
+    filter_line = "Gefiltert → " + " · ".join(parts)
+
+    return render_template(
+        "reports_customers.html",
+        title="Umsatz pro Kunde",
+        rows=rows, totals=totals,
+        von=von, bis=bis, top_n=top_n,
+        kunden_list=kunden_list if 'kunden_list' in locals() else [],
+        artikel_list=artikel_list if 'artikel_list' in locals() else [],
+        kundentyp_list=kundentyp_list if 'kundentyp_list' in locals() else [],
+        kunden_sel=kunden_sel, artikel_sel=artikel_sel, kundentyp_sel=kundentyp_sel,
+        filter_line=filter_line,
+    )
+
 
 @app.get("/health")
 def health():
