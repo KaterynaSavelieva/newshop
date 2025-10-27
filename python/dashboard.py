@@ -385,6 +385,118 @@ def report_customers():
         filter_line=filter_line,
     )
 
+# ─ Звіт: Umsatz pro Artikel ─
+@app.get("/reports/articles")
+@login_required
+def report_articles():
+    from datetime import date, timedelta
+
+    bis = request.args.get("bis") or date.today().isoformat()
+    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+
+    artikel_sel   = request.args.getlist("artikel")
+    kunden_sel    = request.args.getlist("kunden")
+    kundentyp_sel = request.args.getlist("kundentypen")
+
+    try:
+        top_n = int(request.args.get("top", "20"))
+    except ValueError:
+        top_n = 20
+    top_n = max(5, min(top_n, 100))
+
+    rows = []
+    totals = {}
+    filter_line = ""
+
+    conn = get_conn()
+    if conn:
+        with conn.cursor() as cur:
+            # Довідники для селектів
+            cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname")
+            artikel_list = cur.fetchall()
+
+            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) FROM kunden ORDER BY 2")
+            kunden_list = cur.fetchall()
+
+            cur.execute("SELECT kundentypID, bezeichnung FROM kundentyp ORDER BY bezeichnung")
+            kundentyp_list = cur.fetchall()
+
+            # WHERE
+            where_sql = "verkaufsdatum BETWEEN %s AND %s"
+            params = [von, bis]
+
+            if artikel_sel:
+                where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
+                params.extend(artikel_sel)
+            if kunden_sel:
+                where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
+                params.extend(kunden_sel)
+            if kundentyp_sel:
+                where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
+                params.extend(kundentyp_sel)
+
+            # Основний запит
+            sql = f"""
+                SELECT
+                  artikelID,
+                  artikel,
+                  COUNT(*)              AS positionen,
+                  SUM(menge)            AS menge,
+                  ROUND(SUM(umsatz),2)  AS umsatz,
+                  ROUND(SUM(kosten),2)  AS kosten,
+                  ROUND(SUM(marge),2)   AS marge,
+                  ROUND(100*SUM(marge)/NULLIF(SUM(umsatz),0),2) AS marge_prozent
+                FROM v_sales
+                WHERE {where_sql}
+                GROUP BY artikelID, artikel
+                ORDER BY umsatz DESC
+                LIMIT {top_n}
+            """
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        conn.close()
+
+    if rows:
+        totals = {
+            "positionen": sum(r[2] for r in rows),
+            "menge":      float(sum(r[3] for r in rows)),
+            "umsatz":     float(sum(r[4] for r in rows)),
+            "kosten":     float(sum(r[5] for r in rows)),
+            "marge":      float(sum(r[6] for r in rows)),
+        }
+    else:
+        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
+
+    # текст фільтра
+    def labels_for(selected, pairs):
+        m={str(i):n for i,n in pairs}
+        names=[m.get(str(x)) for x in selected if str(x) in m]
+        if not names:return""
+        if len(names)<=6:return", ".join(names)
+        return", ".join(names[:6])+f" … (+{len(names)-6})"
+
+    artikel_txt   = labels_for(artikel_sel, artikel_list if 'artikel_list' in locals() else [])
+    kunden_txt    = labels_for(kunden_sel, kunden_list if 'kunden_list' in locals() else [])
+    kundentyp_txt = labels_for(kundentyp_sel, kundentyp_list if 'kundentyp_list' in locals() else [])
+
+    parts=[f"von: {von}", f"bis: {bis}", f"Top: {top_n}"]
+    if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
+    if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
+    if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
+    filter_line="Gefiltert → "+" · ".join(parts)
+
+    return render_template(
+        "reports_articles.html",
+        title="Umsatz pro Artikel",
+        rows=rows, totals=totals,
+        von=von, bis=bis, top_n=top_n,
+        artikel_list=artikel_list if 'artikel_list' in locals() else [],
+        kunden_list=kunden_list if 'kunden_list' in locals() else [],
+        kundentyp_list=kundentyp_list if 'kundentyp_list' in locals() else [],
+        artikel_sel=artikel_sel, kunden_sel=kunden_sel, kundentyp_sel=kundentyp_sel,
+        filter_line=filter_line,
+    )
+
 
 @app.get("/health")
 def health():
