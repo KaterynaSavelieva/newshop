@@ -189,9 +189,9 @@ def report_daily():
 
             # Групування
             if grp == "month":
-                label_expr = "DATE_FORMAT(verkaufsdatum, '%Y-%m')"
+                label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y-%%m')"
             elif grp == "year":
-                label_expr = "DATE_FORMAT(verkaufsdatum, '%Y')"
+                label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y')"
             else:
                 grp = "day"
                 label_expr = "DATE(verkaufsdatum)"
