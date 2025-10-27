@@ -10,7 +10,7 @@ from db import get_conn
 
 def fetch_low_stock(cur):
     # товари з запасом < 20
-    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 20;")
+    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 25;")
     return cur.fetchall()  # [(artikelID, name, bestand), ...]
 
 def pick_random_supplier(cur, artikel_id):
