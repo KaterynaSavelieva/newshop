@@ -2,265 +2,259 @@
 {% block title %}Umsatz pro Tag{% endblock %}
 
 {% block content %}
-<div class="container-xxl py-4">
 
-    <!-- Заголовок сторінки -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h1 class="h3 mb-0">Umsatz pro Tag</h1>
-        <div class="small text-muted">Bericht · Zeitraum &amp; Mehrfachfilter</div>
-    </div>
+<style>
+    /* ✅ охайні обмеження для графіка */
+    .chart-wrap {
+        position: relative;
+        width: 100%;
+        max-width: 1100px; /* не розтягувати на всю ширину */
+        height: 380px; /* фіксована висота */
+        margin: 0 auto;
+    }
 
-    <!-- Форма фільтрів -->
-    <form class="card shadow-sm mb-4" method="get">
-        <div class="card-body">
-            <!-- Сітка фільтрів -->
-            <div class="row g-3 align-items-end">
-                <!-- Діапазон дат -->
-                <div class="col-12 col-md-3">
-                    <label class="form-label">Von:</label>
-                    <input type="date" name="von" value="{{ von or '' }}" class="form-control">
-                </div>
-                <div class="col-12 col-md-3">
-                    <label class="form-label">Bis:</label>
-                    <input type="date" name="bis" value="{{ bis or '' }}" class="form-control">
-                </div>
+    .filters .form-select[multiple] {
+        height: 220px; /* приємна висота списків */
+    }
 
-                <!-- Групування (Tag/Monat/Jahr) -->
-                <div class="col-12 col-md-2">
-                    <label class="form-label">Detail:</label>
-                    <select name="group" class="form-select">
-                        <option value="tag" {{ 'selected' if (group or 'tag')=='tag'   else '' }}>Tag</option>
-                        <option value="monat" {{ 'selected' if group=='monat' else '' }}>Monat</option>
-                        <option value="jahr" {{ 'selected' if group=='jahr'  else '' }}>Jahr</option>
-                    </select>
-                </div>
+    .filters .card {
+        min-height: 270px;
+    }
 
-                <!-- Клієнти (multi-select) -->
-                <div class="col-12 col-lg-4">
-                    <label class="form-label">Kunde(n):</label>
-                    <!-- підказка: Ctrl/Cmd або Shift для множинного вибору -->
-                    <select name="kunden" class="form-select" multiple size="5">
-                        {% for kid, kname in (kunden_list or []) %}
-                        <option value="{{ kid }}" {% if sel_kunden and kid in sel_kunden %}selected{% endif %}>
-                            {{ kname }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
-                </div>
+    .meta-line {
+        font-size: .95rem;
+    }
+</style>
 
-                <!-- Артиклі (multi-select) -->
-                <div class="col-12 col-lg-4">
-                    <label class="form-label">Artikel:</label>
-                    <select name="artikel" class="form-select" multiple size="5">
-                        {% for aid, aname in (artikel_list or []) %}
-                        <option value="{{ aid }}" {% if sel_artikel and aid in sel_artikel %}selected{% endif %}>
-                            {{ aname }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
-                </div>
-
-                <!-- Кнопки -->
-                <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">
-                        Filtern
-                    </button>
-                    <a class="btn btn-outline-secondary" href="{{ url_for('report_daily') }}">
-                        Zurücksetzen
-                    </a>
-                </div>
-            </div>
-
-            <!-- Рядок-пояснення застосованих фільтрів -->
-            <div class="mt-3 small text-muted">
-                {% set grp_label = {'tag':'Tag','monat':'Monat','jahr':'Jahr'}[(group or 'tag')] %}
-                Gefiltert:
-                Zeitraum <strong>{{ von }}</strong> bis <strong>{{ bis }}</strong>;
-                Detail: <strong>{{ grp_label }}</strong>;
-                {% if sel_kunden and kunden_list %}
-                Kunden:
-                <strong>
-                    {% set names = [] %}
-                    {% for kid, kname in kunden_list %}
-                    {% if kid in sel_kunden %}{% set _ = names.append(kname) %}{% endif %}
-                    {% endfor %}
-                    {{ names|join(', ') if names else 'Alle' }}
-                </strong>;
-                {% else %}
-                Kunden: <strong>Alle</strong>;
-                {% endif %}
-                {% if sel_artikel and artikel_list %}
-                Artikel:
-                <strong>
-                    {% set anames = [] %}
-                    {% for aid, aname in artikel_list %}
-                    {% if aid in sel_artikel %}{% set _ = anames.append(aname) %}{% endif %}
-                    {% endfor %}
-                    {{ anames|join(', ') if anames else 'Alle' }}
-                </strong>.
-                {% else %}
-                Artikel: <strong>Alle</strong>.
-                {% endif %}
-            </div>
-        </div>
-    </form>
-
-    <!-- Карта з графіком -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <h2 class="h6 mb-3">Umsatz – Diagramm (€/Tag)</h2>
-            <canvas id="dailyChart" height="110"></canvas>
-            <div class="form-text">
-                Balken: Umsatz (€), Linie: Marge (%). Linke Y-Achse in € · rechte Y-Achse in %.
-            </div>
-        </div>
-    </div>
-
-    <!-- Таблиця результатів -->
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-sm table-striped table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Tag</th>
-                            <th class="text-end">Positionen</th>
-                            <th class="text-end">Menge</th>
-                            <th class="text-end">Rabatt (€)</th>
-                            <th class="text-end">Umsatz (€)</th>
-                            <th class="text-end">Kosten (€)</th>
-                            <th class="text-end">Marge (€)</th>
-                            <th class="text-end">Umsatz brutto (€)</th>
-                            <th class="text-end">Marge brutto (€)</th>
-                            <th class="text-end">Marge (%)</th>
-                            <th class="text-end">Marge brutto (%)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr>
-                            <td>{{ r[0] }}</td>
-                            <td class="text-end">{{ r[1] }}</td>
-                            <td class="text-end">{{ r[2]|round(2) }}</td>
-                            <td class="text-end">{{ r[3]|round(2) }}</td>
-                            <td class="text-end">{{ r[4]|round(2) }}</td>
-                            <td class="text-end">{{ r[5]|round(2) }}</td>
-                            <td class="text-end">{{ r[6]|round(2) }}</td>
-                            <td class="text-end">{{ r[7]|round(2) }}</td>
-                            <td class="text-end">{{ r[8]|round(2) }}</td>
-                            <td class="text-end">{{ r[9]|round(2) }}</td>
-                            <td class="text-end">{{ r[10]|round(2) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot class="table-light">
-                        <tr>
-                            <th>Summe</th>
-                            <th class="text-end">{{ totals.positionen or 0 }}</th>
-                            <th class="text-end">{{ (totals.menge or 0)|round(2) }}</th>
-                            <th class="text-end">{{ (totals.rabatt_eur or 0)|round(2) }}</th>
-                            <th class="text-end">{{ (totals.umsatz or 0)|round(2) }}</th>
-                            <th class="text-end">{{ (totals.kosten or 0)|round(2) }}</th>
-                            <th class="text-end">{{ (totals.marge or 0)|round(2) }}</th>
-                            <th class="text-end">{{ (totals.umsatz_br or 0)|round(2) }}</th>
-                            <th class="text-end">{{ (totals.marge_br or 0)|round(2) }}</th>
-                            <!-- % обчислюємо прямо в шаблоні -->
-                            <th class="text-end">
-                                {{ ((totals.marge or 0) / (totals.umsatz or 1) * 100)|round(2) }}
-                            </th>
-                            <th class="text-end">
-                                {{ ((totals.marge_br or 0) / (totals.umsatz_br or 1) * 100)|round(2) }}
-                            </th>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-
+<div class="d-flex align-items-center justify-content-between mb-2">
+    <h3 class="mb-0">Umsatz pro Tag</h3>
 </div>
 
-<!-- Chart.js: побудова комбінованого графіка (бар + лінія з другою віссю) -->
+<!-- 🔎 Фільтри -->
+<form class="filters" method="get" action="{{ url_for('report_daily') }}">
+    <div class="row g-3 mb-3">
+        <!-- Дати -->
+        <div class="col-md-3">
+            <label class="form-label">Von:</label>
+            <input type="date" name="von" value="{{ von }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Bis:</label>
+            <input type="date" name="bis" value="{{ bis }}" class="form-control">
+        </div>
+
+        <!-- Кнопки -->
+        <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-primary me-2" type="submit">Filtern</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('report_daily') }}">Zurücksetzen</a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- ✅ Клієнти -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2">Kunde(n)</div>
+                <div class="card-body">
+                    <select name="kunden" class="form-select" multiple>
+                        {# для мультивибору query string має кілька &kunden=ID #}
+                        {% for id, name in kunden_list %}
+                        <option value="{{ id }}"
+                                {% if kunden_sel and (id|string) in kunden_sel %}selected{% endif %}>
+                            {{ name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ✅ Типи клієнтів -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2">Kundentyp</div>
+                <div class="card-body">
+                    <select name="kundentypen" class="form-select" multiple>
+                        {% for id, name in kundentyp_list %}
+                        <option value="{{ id }}"
+                                {% if kundentyp_sel and (id|string) in kundentyp_sel %}selected{% endif %}>
+                            {{ name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ✅ Артикулі -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2">Artikel</div>
+                <div class="card-body">
+                    <select name="artikel" class="form-select" multiple>
+                        {% for id, name in artikel_list %}
+                        <option value="{{ id }}"
+                                {% if artikel_sel and (id|string) in artikel_sel %}selected{% endif %}>
+                            {{ name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- 🧾 Рядок “що відфільтровано” -->
+{% set pills = [] %}
+{% if von %}{% set _ = pills.append('von: ' ~ von) %}{% endif %}
+{% if bis %}{% set _ = pills.append('bis: ' ~ bis) %}{% endif %}
+{% if kunden_sel and kunden_sel|length > 0 %}
+  {% set _ = pills.append('Kunde: ' ~ (kunden_sel|length) ~ ' ausgewählt') %}
+{% endif %}
+{% if kundentyp_sel and kundentyp_sel|length > 0 %}
+  {% set _ = pills.append('Kundentyp: ' ~ (kundentyp_sel|length) ~ ' ausgewählt') %}
+{% endif %}
+{% if artikel_sel and artikel_sel|length > 0 %}
+  {% set _ = pills.append('Artikel: ' ~ (artikel_sel|length) ~ ' ausgewählt') %}
+{% endif %}
+
+{% if pills %}
+<div class="alert alert-light border meta-line py-2 mt-3">
+    Gefiltert:
+    {% for p in pills %}
+    <span class="badge bg-secondary me-1">{{ p }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- 📈 Графік -->
+<div class="card mt-3">
+    <div class="card-header py-2">Umsatz – Diagramm (€/Tag & Marge %)</div>
+    <div class="card-body">
+        <div class="chart-wrap">
+            <canvas id="dailyChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- 📋 Таблиця -->
+<div class="table-responsive mt-3">
+    <table class="table table-sm table-striped align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Tag</th>
+                <th>Positionen</th>
+                <th>Menge</th>
+                <th>Rabatt (€)</th>
+                <th>Umsatz (€)</th>
+                <th>Kosten (€)</th>
+                <th>Marge (€)</th>
+                <th>Umsatz brutto (€)</th>
+                <th>Marge brutto (€)</th>
+                <th>Marge (%)</th>
+                <th>Marge brutto (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td>{{ r[0] }}</td>
+                <td>{{ r[1] }}</td>
+                <td>{{ '%.0f'|format(r[2]) }}</td>
+                <td>{{ '%.2f'|format(r[3]) }}</td>
+                <td>{{ '%.2f'|format(r[4]) }}</td>
+                <td>{{ '%.2f'|format(r[5]) }}</td>
+                <td>{{ '%.2f'|format(r[6]) }}</td>
+                <td>{{ '%.2f'|format(r[7]) }}</td>
+                <td>{{ '%.2f'|format(r[8]) }}</td>
+                <td>{{ '%.2f'|format(r[9]) }}</td>
+                <td>{{ '%.2f'|format(r[10]) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+            <tr>
+                <th>Summe</th>
+                <th>{{ totals.positionen }}</th>
+                <th>{{ '%.0f'|format(totals.menge) }}</th>
+                <th>{{ '%.2f'|format(totals.rabatt_eur) }}</th>
+                <th>{{ '%.2f'|format(totals.umsatz) }}</th>
+                <th>{{ '%.2f'|format(totals.kosten) }}</th>
+                <th>{{ '%.2f'|format(totals.marge) }}</th>
+                <th>{{ '%.2f'|format(totals.umsatz_br) }}</th>
+                <th>{{ '%.2f'|format(totals.marge_br) }}</th>
+                {# відсотки по підсумках = (сума маржі / сума бази) * 100 #}
+                {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
+                {% set marge_br_pct_total = (100.0 * totals.marge_br / (totals.umsatz_br if totals.umsatz_br != 0 else 1.0)) %}
+                <th>{{ '%.2f'|format(marge_pct_total) }}</th>
+                <th>{{ '%.2f'|format(marge_br_pct_total) }}</th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<!-- 📊 Chart.js: 1) Umsatz – стовпці (ліва вісь €), 2) Marge% – лінія (права вісь %) -->
 <script>
-  // Дані для графіку беремо з rows
-  const labels = [
-    {% for r in rows %}"{{ r[0] }}"{% if not loop.last %},{% endif %}{% endfor %}
-  ];
-  const dataUmsatz = [
-    {% for r in rows %}{{ (r[4] or 0)|round(2) }}{% if not loop.last %},{% endif %}{% endfor %}
-  ];
-  const dataMargePct = [
-    {% for r in rows %}{{ (r[9] or 0)|round(2) }}{% if not loop.last %},{% endif %}{% endfor %}
-  ];
+  // Дані для графіка з rows (сервер вже дав таблицю)
+  const labels = {{ rows|map(attribute=0)|list|tojson }};
+  const umsatz = {{ rows|map(attribute=4)|list|tojson }};
+  const margePct = {{ rows|map(attribute=9)|list|tojson }};  // вже обчислено у view v_sales_by_day
 
   const ctx = document.getElementById('dailyChart').getContext('2d');
-  // Створюємо комбінований графік: бари (Umsatz) + лінія (Marge %)
-  const dailyChart = new Chart(ctx, {
+  const chart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: labels,
+      labels,
       datasets: [
         {
-          type: 'bar',
+          type: 'bar',          // ✅ стовпчики — Umsatz
           label: 'Umsatz (€)',
-          data: dataUmsatz,
-          borderWidth: 1,
-          yAxisID: 'yEuro'
+          data: umsatz,
+          yAxisID: 'yEur',
+          borderWidth: 1
         },
         {
-          type: 'line',
+          type: 'line',         // ✅ лінія — Marge %
           label: 'Marge (%)',
-          data: dataMargePct,
-          tension: 0.25,
+          data: margePct,
+          yAxisID: 'yPct',
           borderWidth: 2,
-          pointRadius: 2,
-          yAxisID: 'yPct'
+          fill: false,
+          tension: 0.25,
+          pointRadius: 2
         }
       ]
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,
+      maintainAspectRatio: false,   // поважаємо висоту .chart-wrap
       scales: {
-        // Ліва вісь — євро
-        yEuro: {
+        yEur: {
           type: 'linear',
           position: 'left',
-          ticks: {
-            // формат підписів по осі €
-            callback: (v) => '€ ' + v
-          }
+          title: { display: true, text: '€' },
+          beginAtZero: true
         },
-        // Права вісь — відсотки
         yPct: {
           type: 'linear',
           position: 'right',
-          grid: { drawOnChartArea: false },
-          ticks: {
-            callback: (v) => v + ' %'
-          }
+          title: { display: true, text: '%' },
+          beginAtZero: true,
+          grid: { drawOnChartArea: false }  // щоб сітка правої осі не дублювалась
         },
         x: {
-          ticks: { maxRotation: 0, autoSkip: true }
+          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14 }
         }
       },
       plugins: {
-        legend: { position: 'top' },
-        tooltip: {
-          callbacks: {
-            // гарні підказки для різних осей
-            label: function(ctx) {
-              const ds = ctx.dataset.label || '';
-              const v  = ctx.parsed.y;
-              if (ctx.dataset.yAxisID === 'yPct') return `${ds}: ${v.toFixed(2)} %`;
-              return `${ds}: € ${v.toFixed(2)}`;
-            }
-          }
-        }
+        legend: { display: true }
       }
     }
   });
 </script>
+
 {% endblock %}
