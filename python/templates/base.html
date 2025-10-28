@@ -56,9 +56,14 @@
                         <a class="nav-link {% if 'report_customers' in request.endpoint %}active{% endif %}"
                            href="{{ url_for('report_customers') }}">Umsatz pro Kunde</a>
                     </li>
+
                     <li class="nav-item">
                         <a class="nav-link {% if 'report_articles' in request.endpoint %}active{% endif %}"
                            href="{{ url_for('report_articles') }}">Umsatz pro Artikel</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'report_stock_low' in request.endpoint %}active{% endif %}"
+                           href="{{ url_for('report_stock_low') }}">Lagerwarnung / Artikel mit niedrigem Bestand</a>
                     </li>
 
 
