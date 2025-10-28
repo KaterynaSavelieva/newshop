@@ -22,20 +22,6 @@ app.secret_key = os.getenv("FLASK_SECRET", "dev")
 
 # ─ Flask-Login ─
 login_manager = LoginManager(app)
-login_manager.login_view = "login"
-
-# Проста модель користувача (дані з БД)
-class User(UserMixin):
-    def __init__(self, id, email, name, role, is_active):
-        self.id = str(id)
-        self.email = email
-        self.name = name
-        self.role = role
-        self.active = bool(is_active)
-
-    def is_active(self):
-        return self.active
-
 @login_manager.user_loader
 def load_user(user_id: str):
     conn = get_conn()
@@ -51,6 +37,20 @@ def load_user(user_id: str):
     if not row:
         return None
     return User(*row)
+
+login_manager.login_view = "login"
+
+# Проста модель користувача (дані з БД)
+class User(UserMixin):
+    def __init__(self, id, email, name, role, is_active):
+        self.id = str(id)
+        self.email = email
+        self.name = name
+        self.role = role
+        self.active = bool(is_active)
+
+    def is_active(self):
+        return self.active
 
 @app.context_processor
 def inject_user():
@@ -220,9 +220,9 @@ def report_daily():
             "marge_br":   float(sum(r[8] for r in rows)),
         }
     else:
-        totals = {"positionen":0,"menge":0.0,"rabatt_eur":0.0,"umsatz":0.0,"kosten":0.0,"мarge":0.0,"umsatz_br":0.0,"marge_br":0.0}
+        totals = {"positionen":0,"menge":0.0,"rabatt_eur":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0,"umsatz_br":0.0,"marge_br":0.0}
 
-    # ✅ Рядок «Gefiltert»: використовуємо утиліту f_labels_for
+    # ✅ Рядок «Gefilterт»: використовуємо утиліту f_labels_for
     kunden_txt    = f_labels_for(kunden_sel,    kunden_list)
     kundentyp_txt = f_labels_for(kundentyp_sel, kundentyp_list)
     artikel_txt   = f_labels_for(artikel_sel,   artikel_list)
@@ -251,7 +251,6 @@ def report_daily():
 def report_customers():
     from datetime import date, timedelta
 
-    # Параметри
     bis = request.args.get("bis") or date.today().isoformat()
     von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
 
@@ -317,7 +316,7 @@ def report_customers():
             "marge":      float(sum(r[6] for r in rows)),
         }
     else:
-        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"мarge":0.0}
+        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
 
     # ✅ Рядок “Gefiltert”
     kunden_txt    = f_labels_for(kunden_sel,    kunden_list)
@@ -445,7 +444,7 @@ def report_articles():
             "marge":      float(sum(r[marge_idx]  for r in rows)),
         }
     else:
-        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"мarge":0.0}
+        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
 
     # ✅ Рядок фільтра
     artikel_txt   = f_labels_for(artikel_sel,   artikel_list)
