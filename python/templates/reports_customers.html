@@ -28,7 +28,7 @@
 
 <h3 class="mb-3">Umsatz pro Kunde (Top {{ top_n }})</h3>
 
-<form class="filters" method="get" action="{{ url_for('report_customers') }}">
+<form class="filters" method="get" action="{{ url_for('reports.report_customers') }}">
     <div class="row g-3 mb-3">
         <div class="col-md-3">
             <label class="form-label">Von</label>
@@ -44,7 +44,7 @@
         </div>
         <div class="col-md-4 d-flex align-items-end justify-content-end gap-2 action-bar">
             <button class="btn btn-primary" type="submit">Filtern</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('report_customers') }}">Zurücksetzen</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_customers') }}">Zurücksetzen</a>
         </div>
     </div>
 
@@ -183,7 +183,7 @@
   // Швидкі клавіші
   document.addEventListener('keydown',(e)=>{
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ document.querySelector('form.filters').submit(); }
-    if(e.key==='Escape'){ window.location="{{ url_for('report_customers') }}"; }
+    if(e.key==='Escape'){ window.location="{{ url_for('reports.report_customers') }}"; }
   });
 </script>
 

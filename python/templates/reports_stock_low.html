@@ -18,7 +18,7 @@
 </div>
 
 <!-- 🔎 Фільтри -->
-<form class="filters" method="get" action="{{ url_for('report_stock_low') }}">
+<form class="filters" method="get" action="{{ url_for('reports.report_stock_low') }}">
   <div class="row g-3 mb-3">
     <div class="col-sm-3 col-md-2">
       <label class="form-label">Schwellenwert (Stück)</label>
@@ -26,7 +26,7 @@
     </div>
     <div class="col-sm-4 col-md-3 d-flex align-items-end">
       <button class="btn btn-primary me-2" type="submit">Filtern</button>
-      <a class="btn btn-outline-secondary" href="{{ url_for('report_stock_low') }}">Zurücksetzen</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_stock_low') }}">Zurücksetzen</a>
     </div>
   </div>
 </form>

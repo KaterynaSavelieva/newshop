@@ -34,7 +34,7 @@
     <h3 class="mb-0">Umsatz pro Tag</h3>
 </div>
 
-<form class="filters" method="get" action="{{ url_for('report_daily') }}">
+<form class="filters" method="get" action="{{ url_for('reports.report_daily') }}">
     <div class="row g-3 mb-3">
         <!-- Дати -->
         <div class="col-md-3">
@@ -64,7 +64,7 @@
         <!-- Кнопки -->
         <div class="col-md-2 d-flex align-items-end justify-content-end gap-2 action-bar">
             <button class="btn btn-primary" type="submit">Filtern</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('report_daily') }}">Zurücksetzen</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_daily') }}">Zurücksetzen</a>
         </div>
     </div>
 

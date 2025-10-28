@@ -28,7 +28,7 @@
 
 <h3 class="mb-3">Umsatz pro Artikel{% if grp!='items' %} – {{ 'Tag' if grp=='day' else ('Monat' if grp=='month' else 'Jahr') }}{% endif %}</h3>
 
-<form class="filters" method="get" action="{{ url_for('report_articles') }}">
+<form class="filters" method="get" action="{{ url_for('reports.report_articles') }}">
     <div class="row g-3 mb-3">
         <div class="col-md-3">
             <label class="form-label">Von</label>
