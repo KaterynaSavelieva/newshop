@@ -87,7 +87,7 @@ def add_sale_items(cur, verkauf_id, items, when, rabatt_pct):
 def main():
     conn = get_conn()
     if not conn:
-        print("❌ Немає підключення до БД.")
+        print("Keine Verbindung zur Datenbank")
         return
 
     try:
@@ -103,20 +103,20 @@ def main():
             candidates = pick_articles_with_stock(cur, max_items=max_items)
 
             if not candidates:
-                raise RuntimeError("Немає товарів з наявним складом (>0). Продаж скасовано.")
+                raise RuntimeError("Keine Produkte auf Lager (>0). Verkauf abgebrochen")
 
             # 4) додаємо позиції
             added, total = add_sale_items(cur, verkauf_id, candidates, when, rabatt_pct)
 
             if added == 0:
                 # якщо нічого не додали — скасовуємо шапку
-                raise RuntimeError("Жодну позицію не додано (можливо, склад=0). Продаж скасовано.")
+                raise RuntimeError("Keine Artikel hinzugefügt (möglicherweise Lagerbestand=0). Verkauf abgebrochen.")
 
         conn.commit()
-        print(f"✅ Продаж створено: verkaufID={verkauf_id}, позицій={added}, сума(без знижок)={total}, знижка клієнта={rabatt_pct}%")
+        print(f"Verkauf erstellt:: verkaufID={verkauf_id}, позицій={added}, сума(без знижок)={total}, Kundenrabatt={rabatt_pct}%")
     except Exception as e:
         conn.rollback()
-        print(f"⚠️ Продаж скасовано. Причина: {e}")
+        print(f"Verkauf abgebrochen. Grund: {e}")
     finally:
         conn.close()
 

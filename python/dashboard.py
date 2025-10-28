@@ -345,11 +345,11 @@ def report_customers():
     # Підсумки
     if rows:
         totals = {
-            "positionen": sum(r[3] for r in rows),
-            "menge":      float(sum(r[4] for r in rows)),
-            "umsatz":     float(sum(r[5] for r in rows)),
-            "kosten":     float(sum(r[6] for r in rows)),
-            "marge":      float(sum(r[7] for r in rows)),
+            "positionen": sum(r[2] for r in rows),
+            "menge":      float(sum(r[3] for r in rows)),
+            "umsatz":     float(sum(r[4] for r in rows)),
+            "kosten":     float(sum(r[5] for r in rows)),
+            "marge":      float(sum(r[6] for r in rows)),
         }
     else:
         totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
@@ -545,7 +545,7 @@ def report_stock_low():
     try:
         threshold = int(threshold)
     except ValueError:
-        threshold = 5
+        threshold = 150
 
     rows = []
     conn = get_conn()

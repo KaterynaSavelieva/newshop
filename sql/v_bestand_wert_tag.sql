@@ -14,4 +14,7 @@ LEFT JOIN verkauf v ON v.verkaufID = va.verkaufID
 GROUP BY tag, a.artikelID
 ORDER BY tag DESC, a.artikelID;
 
-SELECT * FROM v_bestand_tag where lagerwert  ;
+SELECT * FROM v_bestand_tag 
+-- where lagerwert  
+-- ORDER BY bestand DESC
+;

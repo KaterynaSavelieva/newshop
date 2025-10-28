@@ -9,8 +9,7 @@ JOIN einkaufartikel ON einkauf.einkaufID=einkaufartikel.einkaufID
 JOIN artikel ON artikel.artikelID=einkaufartikel.artikelID 
 JOIN lieferanten ON lieferanten.lieferantID=einkauf.lieferantID
 -- WHERE einkauf.lieferantID=10
--- 
-WHERE einkaufartikel.artikelID=8
+-- WHERE einkaufartikel.artikelID=8
 
 ORDER BY einkaufartikel.einkaufID DESC;
 
