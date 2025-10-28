@@ -3,97 +3,80 @@
 {% block content %}
 
 <style>
-    .chart-wrap {
-        position: relative;
-        width: 100%;
-        max-width: 1100px;
-        height: 420px;
-        margin: 0 auto;
-    }
-
-    .filters .form-select[multiple] {
-        height: 220px;
-    }
-
-    .filters .card {
-        min-height: 270px;
-    }
-
-    .action-bar {
-        position: sticky;
-        top: 8px;
-        z-index: 2;
-    }
+  .chart-wrap{position:relative;width:100%;max-width:1100px;height:420px;margin:0 auto}
+  .filters .form-select[multiple]{height:220px}
+  .filters .card{min-height:270px}
+  .action-bar{position:sticky;top:8px;z-index:2}
 </style>
 
 <h3 class="mb-3">Umsatz pro Kunde (Top {{ top_n }})</h3>
 
 <form class="filters" method="get" action="{{ url_for('reports.report_customers') }}">
-    <div class="row g-3 mb-3">
-        <div class="col-md-3">
-            <label class="form-label">Von</label>
-            <input class="form-control" type="date" name="von" value="{{ von }}">
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <label class="form-label">Von</label>
+      <input class="form-control" type="date" name="von" value="{{ von }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Bis</label>
+      <input class="form-control" type="date" name="bis" value="{{ bis }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Top N</label>
+      <input class="form-control" type="number" name="top" min="5" max="100" value="{{ top_n }}">
+    </div>
+    <div class="col-md-4 d-flex align-items-end justify-content-end gap-2 action-bar">
+      <button class="btn btn-primary" type="submit">Filtern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_customers') }}">Zurücksetzen</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Kunde(n) -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header py-2">Kunde(n)</div>
+        <div class="card-body">
+          <select name="kunden" class="form-select" multiple>
+            {% for id,name in kunden_list %}
+            <option value="{{ id }}" {% if kunden_sel and (id|string) in kunden_sel %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
         </div>
-        <div class="col-md-3">
-            <label class="form-label">Bis</label>
-            <input class="form-control" type="date" name="bis" value="{{ bis }}">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Top N</label>
-            <input class="form-control" type="number" name="top" min="5" max="100" value="{{ top_n }}">
-        </div>
-        <div class="col-md-4 d-flex align-items-end justify-content-end gap-2 action-bar">
-            <button class="btn btn-primary" type="submit">Filtern</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_customers') }}">Zurücksetzen</a>
-        </div>
+      </div>
     </div>
 
-    <div class="row g-3">
-        <!-- Kunde(n) -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header py-2">Kunde(n)</div>
-                <div class="card-body">
-                    <select name="kunden" class="form-select" multiple>
-                        {% for id, name in kunden_list %}
-                        <option value="{{ id }}" {% if kunden_sel and (id|string) in kunden_sel %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
-                </div>
-            </div>
+    <!-- Kundentyp -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header py-2">Kundentyp</div>
+        <div class="card-body">
+          <select name="kundentypen" class="form-select" multiple>
+            {% for id,name in kundentyp_list %}
+            <option value="{{ id }}" {% if kundentyp_sel and (id|string) in kundentyp_sel %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
         </div>
-
-        <!-- Kundentyp -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header py-2">Kundentyp</div>
-                <div class="card-body">
-                    <select name="kundentypen" class="form-select" multiple>
-                        {% for id, name in kundentyp_list %}
-                        <option value="{{ id }}" {% if kundentyp_sel and (id|string) in kundentyp_sel %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Artikel -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header py-2">Artikel</div>
-                <div class="card-body">
-                    <select name="artikel" class="form-select" multiple>
-                        {% for id, name in artikel_list %}
-                        <option value="{{ id }}" {% if artikel_sel and (id|string) in artikel_sel %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
+
+    <!-- Artikel -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header py-2">Artikel</div>
+        <div class="card-body">
+          <select name="artikel" class="form-select" multiple>
+            {% for id,name in artikel_list %}
+            <option value="{{ id }}" {% if artikel_sel and (id|string) in artikel_sel %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </form>
 
 {% if filter_line %}
@@ -101,75 +84,75 @@
 {% endif %}
 
 <div class="card mt-3">
-    <div class="card-header py-2">Umsatz – Balken &amp; Marge (%) – Linie</div>
-    <div class="card-body">
-        <div class="chart-wrap"><canvas id="custChart"></canvas></div>
-    </div>
+  <div class="card-header py-2">Umsatz – Balken &amp; Marge (%) – Linie</div>
+  <div class="card-body">
+    <div class="chart-wrap"><canvas id="custChart"></canvas></div>
+  </div>
 </div>
 
 <div class="table-responsive mt-3">
-    <table class="table table-sm table-striped table-bordered align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>#</th>
-                <th>Kunde</th>
-                <th>Positionen</th>
-                <th>Menge</th>
-                <th>Umsatz (€)</th>
-                <th>Kosten (€)</th>
-                <th>Marge (€)</th>
-                <th>Marge (%)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in rows %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ r[1] }}</td>   {# Kundenname #}
-                <td>{{ r[2] }}</td>
-                <td>{{ '%.0f'|format(r[3]) }}</td>
-                <td>{{ '%.2f'|format(r[4]) }}</td>
-                <td>{{ '%.2f'|format(r[5]) }}</td>
-                <td>{{ '%.2f'|format(r[6]) }}</td>
-                <td>{{ '%.2f'|format(r[7]) }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        <tfoot class="table-light">
-            <tr>
-                <th colspan="2">Summe</th>
-                <th>{{ totals.positionen }}</th>
-                <th>{{ '%.0f'|format(totals.menge) }}</th>
-                <th>{{ '%.2f'|format(totals.umsatz) }}</th>
-                <th>{{ '%.2f'|format(totals.kosten) }}</th>
-                <th>{{ '%.2f'|format(totals.marge) }}</th>
-                <th>
-                    {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
-                    {{ '%.2f'|format(marge_pct_total) }}
-                </th>
-            </tr>
-        </tfoot>
-    </table>
+  <table class="table table-sm table-striped table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>#</th>
+        <th>Kunde</th>
+        <th>Positionen</th>
+        <th>Menge</th>
+        <th>Umsatz (€)</th>
+        <th>Kosten (€)</th>
+        <th>Marge (€)</th>
+        <th>Marge (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ r[1] }}</td>
+        <td>{{ r[2] }}</td>
+        <td>{{ '%.0f'|format(r[3]) }}</td>
+        <td>{{ '%.2f'|format(r[4]) }}</td>
+        <td>{{ '%.2f'|format(r[5]) }}</td>
+        <td>{{ '%.2f'|format(r[6]) }}</td>
+        <td>{{ '%.2f'|format(r[7]) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="table-light">
+      <tr>
+        <th colspan="2">Summe</th>
+        <th>{{ totals.positionen }}</th>
+        <th>{{ '%.0f'|format(totals.menge) }}</th>
+        <th>{{ '%.2f'|format(totals.umsatz) }}</th>
+        <th>{{ '%.2f'|format(totals.kosten) }}</th>
+        <th>{{ '%.2f'|format(totals.marge) }}</th>
+        <th>
+          {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
+          {{ '%.2f'|format(marge_pct_total) }}
+        </th>
+      </tr>
+    </tfoot>
+  </table>
 </div>
 
 <script>
-  // Дані з rows: [kundenID, kunde, positionen, menge, umsatz, kosten, marge, marge_pct]
+  // rows: [kundenID, kunde, positionen, menge, umsatz, kosten, marge, marge_pct]
   const labels    = {{ rows|map(attribute=1)|list|tojson }};
   const umsatz    = {{ rows|map(attribute=4)|list|tojson }};
-  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};   // новий бар
+  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};
   const margePct  = {{ rows|map(attribute=7)|list|tojson }};
 
-  new Chart(document.getElementById('custChart'),{
-    type:'bar',
-    data:{
+  new Chart(document.getElementById('custChart'), {
+    type: 'bar',
+    data: {
       labels,
-      datasets:[
+      datasets: [
         { type:'bar',  label:'Umsatz (€)', data: umsatz,    yAxisID:'yEur', borderWidth:1 },
-        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },  // додано
+        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },
         { type:'line', label:'Marge (%)',  data: margePct,  yAxisID:'yPct', borderWidth:2, fill:false, tension:.25, pointRadius:2 }
       ]
     },
-    options:{
+    options: {
       responsive:true, maintainAspectRatio:false,
       scales:{
         yEur:{ position:'left',  beginAtZero:true, title:{display:true,text:'€'} },
@@ -180,7 +163,7 @@
     }
   });
 
-  // Швидкі клавіші
+  // Hotkeys
   document.addEventListener('keydown',(e)=>{
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ document.querySelector('form.filters').submit(); }
     if(e.key==='Escape'){ window.location="{{ url_for('reports.report_customers') }}"; }
