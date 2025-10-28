@@ -15,7 +15,7 @@ from werkzeug.security import check_password_hash
 from .db import get_conn  # наша функція підключення до БД newshopdb
 
 # ✅ використовуємо твої утиліти
-from .reports.service import f_group_expr, f_labels_for
+from .reports.service import f_group_expr, f_labels_for, f_build_where_sql
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev")
@@ -177,20 +177,9 @@ def report_daily():
             artikel_list = cur.fetchall()
 
             # WHERE
-            where_sql = "verkaufsdatum BETWEEN %s AND %s"
-            params = [von, bis]
+            where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
 
-            if kunden_sel:
-                where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
-                params.extend(kunden_sel)
-            if kundentyp_sel:
-                where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
-                params.extend(kundentyp_sel)
-            if artikel_sel:
-                where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
-                params.extend(artikel_sel)
-
-            # ✅ Групування єдиною функцією
+            # Групування єдиною функцією
             label_expr = f_group_expr(grp, "verkaufsdatum")
 
             cur.execute(
@@ -295,18 +284,7 @@ def report_customers():
             artikel_list = cur.fetchall()
 
             # WHERE
-            where_sql = "verkaufsdatum BETWEEN %s AND %s"
-            params = [von, bis]
-
-            if kunden_sel:
-                where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
-                params.extend(kunden_sel)
-            if kundentyp_sel:
-                where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
-                params.extend(kundentyp_sel)
-            if artikel_sel:
-                where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
-                params.extend(artikel_sel)
+            where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
 
             sql = f"""
                 SELECT
@@ -401,17 +379,7 @@ def report_articles():
             kundentyp_list = cur.fetchall()
 
             # WHERE
-            where_sql = "verkaufsdatum BETWEEN %s AND %s"
-            params = [von, bis]
-            if artikel_sel:
-                where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
-                params.extend(artikel_sel)
-            if kunden_sel:
-                where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
-                params.extend(kunden_sel)
-            if kundentyp_sel:
-                where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
-                params.extend(kundentyp_sel)
+            where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
 
             if grp == "items":
                 # Top-N по артикулах

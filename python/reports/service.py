@@ -31,3 +31,34 @@ def f_labels_for(selected_ids, pairs, limit: int = 6) -> str:
     if len(names) <= limit:
         return ", ".join(names)
     return ", ".join(names[:limit]) + f" … (+{len(names)-limit})"
+
+
+def f_build_where_sql(von: str, bis: str,
+                    kunden_sel: list[str] | list = None,
+                    kundentyp_sel: list[str] | list = None,
+                    artikel_sel: list[str] | list = None) -> tuple[str, list]:
+    """
+    Повертає (where_sql, params) для таблиці/в’ю з колонками:
+    verkaufsdatum, kundenID, kundentypID, artikelID.
+    """
+    kunden_sel = kunden_sel or []
+    kundentyp_sel = kundentyp_sel or []
+    artikel_sel = artikel_sel or []
+
+    where_sql = "verkaufsdatum BETWEEN %s AND %s"
+    params: list = [von, bis]
+
+    if kunden_sel:
+        where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
+        params.extend(kunden_sel)
+
+    if kundentyp_sel:
+        where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
+        params.extend(kundentyp_sel)
+
+    if artikel_sel:
+        where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
+        params.extend(artikel_sel)
+
+    return where_sql, params
+
