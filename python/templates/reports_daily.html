@@ -115,11 +115,6 @@
         </div>
     </div>
 
-    <!-- Дубль кнопок внизу -->
-    <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-primary" type="submit">Filtern</button>
-        <a class="btn btn-outline-secondary" href="{{ url_for('report_daily') }}">Zurücksetzen</a>
-    </div>
 </form>
 
 {# Рядок “що відфільтровано” з конкретними назвами #}
@@ -231,7 +226,7 @@
   // Дані для графіка
   const labels    = {{ rows|map(attribute=0)|list|tojson }};
   const umsatz    = {{ rows|map(attribute=4)|list|tojson }};  // €
-  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};  // €  <-- ДОДАНО
+  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};  // €
   const margePct  = {{ rows|map(attribute=9)|list|tojson }};  // %
 
   const ctx = document.getElementById('dailyChart').getContext('2d');
@@ -241,7 +236,7 @@
       labels,
       datasets: [
         { type:'bar',  label:'Umsatz (€)', data: umsatz,    yAxisID:'yEur', borderWidth:1 },
-        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },  // новий стовпчик
+        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },
         { type:'line', label:'Marge (%)',  data: margePct,  yAxisID:'yPct', borderWidth:2, fill:false, tension:0.25, pointRadius:2 }
       ]
     },

@@ -1,6 +1,6 @@
 # python/dashboard.py
-# Dashboard (DE) + Login/Logout via Flask-Login
-# Звіт /reports/daily з фільтрами та графіком (Umsatz=bar, Marge%=line)
+# Flask Dashboard + Login + 3 звіти (daily / customers / articles) + stock_low
+# Спрощена версія з хелперами для фільтрів, групувань і підсумків.
 
 import os
 from datetime import date, timedelta
@@ -12,16 +12,17 @@ from flask_login import (
 )
 from werkzeug.security import check_password_hash
 
-from .db import get_conn  # наша функція підключення до БД newshopdb
+from .db import get_conn
 
+# ─────────────────────────────
+# App & Login
+# ─────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev")
 
-# ─ Flask-Login ─
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-# Проста модель користувача (дані з БД)
 class User(UserMixin):
     def __init__(self, id, email, name, role, is_active):
         self.id = str(id)
@@ -29,7 +30,6 @@ class User(UserMixin):
         self.name = name
         self.role = role
         self.active = bool(is_active)
-
     def is_active(self):
         return self.active
 
@@ -39,21 +39,103 @@ def load_user(user_id: str):
     if not conn:
         return None
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, email, name, role, is_active FROM users WHERE id=%s",
-            (user_id,)
-        )
+        cur.execute("SELECT id, email, name, role, is_active FROM users WHERE id=%s", (user_id,))
         row = cur.fetchone()
     conn.close()
-    if not row:
-        return None
-    return User(*row)
+    return User(*row) if row else None
 
 @app.context_processor
 def inject_user():
     return dict(current_user=current_user)
 
-# ─ Авторизація ─
+# ─────────────────────────────
+# Хелпери (менше дублювань)
+# ─────────────────────────────
+def _dates_from_args():
+    """Повертає (von, bis) ISO дати з query або дефолт: останні 30 днів."""
+    bis = request.args.get("bis") or date.today().isoformat()
+    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+    return von, bis
+
+def _multi(name: str):
+    """Читає мультивибірні параметри з query (?kunden=1&kunden=2...)."""
+    return request.args.getlist(name)
+
+def _group_expr(grp: str, col: str):
+    """
+    Повертає SQL-вираз групування по даті та нормалізоване значення grp.
+    grp in {"day","month","year"}
+    """
+    if grp == "month":
+        return "DATE_FORMAT(%s, '%%Y-%%m')" % col, "month"
+    if grp == "year":
+        return "DATE_FORMAT(%s, '%%Y')" % col, "year"
+    return "DATE(%s)" % col, "day"
+
+def _build_where(von, bis, kunden_sel, kundentyp_sel, artikel_sel):
+    """Формує WHERE і params для v_sales з урахуванням фільтрів."""
+    where_sql = "verkaufsdatum BETWEEN %s AND %s"
+    params = [von, bis]
+    if kunden_sel:
+        where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
+        params.extend(kunden_sel)
+    if kundentyp_sel:
+        where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
+        params.extend(kundentyp_sel)
+    if artikel_sel:
+        where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
+        params.extend(artikel_sel)
+    return where_sql, params
+
+def _labels_for(selected_ids, pairs):
+    """
+    Обертає ID у зрозумілі назви для "Gefiltert → ...".
+    pairs — список кортежів [(id, label), ...]
+    """
+    m = {str(i): n for i, n in pairs}
+    names = [m.get(str(x)) for x in selected_ids if str(x) in m]
+    if not names:
+        return ""
+    if len(names) <= 6:
+        return ", ".join(names)
+    return ", ".join(names[:6]) + f" … (+{len(names)-6})"
+
+def _totals_from_rows(rows, idx):
+    """
+    Підсумки для агрегованих звітів.
+    idx = dict з ключами: pos, menge, umsatz, kosten, marge, (опц.) rabatt, umsatz_br, marge_br
+    """
+    if not rows:
+        return dict(positionen=0, menge=0.0, umsatz=0.0, kosten=0.0, marge=0.0,
+                    rabatt_eur=0.0, umsatz_br=0.0, marge_br=0.0)
+
+    def s(col):
+        return float(sum(r[idx[col]] for r in rows)) if col in idx else 0.0
+
+    return {
+        "positionen": int(sum(r[idx["pos"]] for r in rows)) if "pos" in idx else 0,
+        "menge":      s("menge"),
+        "umsatz":     s("umsatz"),
+        "kosten":     s("kosten"),
+        "marge":      s("marge"),
+        "rabatt_eur": s("rabatt"),
+        "umsatz_br":  s("umsatz_br"),
+        "marge_br":   s("marge_br"),
+    }
+
+def _fetch_lookups(cur):
+    """Завантажує довідники разом (клієнти/типи/артикули)."""
+    cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
+    kunden_list = cur.fetchall()
+    cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
+    kundentyp_list = cur.fetchall()
+    cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
+    artikel_list = cur.fetchall()
+    return kunden_list, kundentyp_list, artikel_list
+
+# ─────────────────────────────
+# Auth routes
+# ─────────────────────────────
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
@@ -63,29 +145,23 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-
         conn = get_conn()
         if conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT id, email, name, role, is_active, password_hash
                     FROM users
                     WHERE email=%s AND is_active=1
-                    """,
-                    (email,)
-                )
+                """, (email,))
                 row = cur.fetchone()
             conn.close()
-
             if row:
                 uid, uemail, uname, urole, uactive, phash = row
                 if check_password_hash(phash, password):
                     login_user(User(uid, uemail, uname, urole, uactive))
                     flash("Erfolgreich eingeloggt.", "success")
                     return redirect(url_for("index"))
-                else:
-                    error = "Falsches Passwort."
+                error = "Falsches Passwort."
             else:
                 error = "Unbekannte E-Mail oder Konto ist deaktiviert."
         else:
@@ -100,18 +176,17 @@ def logout():
     flash("Abgemeldet.", "info")
     return redirect(url_for("login"))
 
-# ─ Головний дашборд (простий приклад останніх операцій) ─
+# ─────────────────────────────
+# Dashboard (останні операції)
+# ─────────────────────────────
 @app.get("/")
 @login_required
 def index():
     rows = []
-    totals = {"umsatz": 0.0, "kosten": 0.0, "marge": 0.0}
-
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT
                     verkaufsdatum,   -- 0
                     kunde,           -- 1
@@ -120,22 +195,21 @@ def index():
                     menge,           -- 4
                     vk_preis,        -- 5
                     ek_preis,        -- 6
-                    umsatz,          -- 7 (нетто)
+                    umsatz,          -- 7
                     kosten,          -- 8
                     marge            -- 9
                 FROM v_sales
                 ORDER BY verkaufsdatum DESC
                 LIMIT 100
-                """
-            )
+            """)
             rows = cur.fetchall()
         conn.close()
 
-        if rows:
-            totals["umsatz"] = float(sum(r[7] for r in rows))
-            totals["kosten"] = float(sum(r[8] for r in rows))
-            totals["marge"]  = float(sum(r[9] for r in rows))
-
+    totals = {
+        "umsatz": float(sum(r[7] for r in rows)) if rows else 0.0,
+        "kosten": float(sum(r[8] for r in rows)) if rows else 0.0,
+        "marge":  float(sum(r[9] for r in rows)) if rows else 0.0,
+    }
     return render_template("dashboard.html", rows=rows, totals=totals, title="Dashboard")
 
 @app.get("/dashboard")
@@ -143,116 +217,64 @@ def index():
 def dashboard_alias():
     return redirect(url_for("index"))
 
-# ─ Звіт: продажі (з фільтрами) ─
+# ─────────────────────────────
+# Звіт: Umsatz pro Tag/Monat/Jahr
+# ─────────────────────────────
 @app.get("/reports/daily")
 @login_required
 def report_daily():
-    # Параметри
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
-    grp = request.args.get("grp", "day")  # day | month | year
+    von, bis = _dates_from_args()
+    grp_req = request.args.get("grp", "day")
 
-    kunden_sel    = request.args.getlist("kunden")
-    artikel_sel   = request.args.getlist("artikel")
-    kundentyp_sel = request.args.getlist("kundentypen")
+    kunden_sel = _multi("kunden")
+    artikel_sel = _multi("artikel")
+    kundentyp_sel = _multi("kundentypen")
 
     rows = []
-    totals = {}
-    filter_line = ""
+    kunden_list = []
+    kundentyp_list = []
+    artikel_list = []
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            # довідники (списки)
-            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
-            kunden_list = cur.fetchall()  # [(id, label), ...]
+            kunden_list, kundentyp_list, artikel_list = _fetch_lookups(cur)
+            where_sql, params = _build_where(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
+            label_expr, grp = _group_expr(grp_req, "verkaufsdatum")
 
-            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
-            kundentyp_list = cur.fetchall()
-
-            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
-            artikel_list = cur.fetchall()
-
-            # WHERE
-            where_sql = "verkaufsdatum BETWEEN %s AND %s"
-            params = [von, bis]
-
-            if kunden_sel:
-                where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
-                params.extend(kunden_sel)
-            if kundentyp_sel:
-                where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
-                params.extend(kundentyp_sel)
-            if artikel_sel:
-                where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
-                params.extend(artikel_sel)
-
-            # Групування
-            if grp == "month":
-                label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y-%%m')"
-            elif grp == "year":
-                label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y')"
-            else:
-                grp = "day"
-                label_expr = "DATE(verkaufsdatum)"
-
-            cur.execute(
-                f"""
+            cur.execute(f"""
                 SELECT
                   {label_expr}                        AS tag,
-                  COUNT(*)                           AS positionen,
-                  SUM(menge)                         AS menge,
-                  ROUND(SUM(rabatt_eur), 2)          AS rabatt_eur,
-                  ROUND(SUM(umsatz), 2)              AS umsatz,
-                  ROUND(SUM(kosten), 2)              AS kosten,
-                  ROUND(SUM(marge), 2)               AS marge,
-                  ROUND(SUM(umsatz_brutto), 2)       AS umsatz_brutto,
-                  ROUND(SUM(marge_brutto), 2)        AS marge_brutto,
-                  ROUND(100 * SUM(marge) / NULLIF(SUM(umsatz), 0), 2)            AS marge_prozent,
-                  ROUND(100 * SUM(marge_brutto) / NULLIF(SUM(umsatz_brutto), 0), 2) AS marge_brutto_prozent
+                  COUNT(*)                            AS positionen,
+                  SUM(menge)                          AS menge,
+                  ROUND(SUM(rabatt_eur), 2)           AS rabatt_eur,
+                  ROUND(SUM(umsatz), 2)               AS umsatz,
+                  ROUND(SUM(kosten), 2)               AS kosten,
+                  ROUND(SUM(marge), 2)                AS marge,
+                  ROUND(SUM(umsatz_brutto), 2)        AS umsatz_brutto,
+                  ROUND(SUM(marge_brutto), 2)         AS marge_brutto,
+                  ROUND(100*SUM(marge)/NULLIF(SUM(umsatz),0), 2)            AS marge_prozent,
+                  ROUND(100*SUM(marge_brutto)/NULLIF(SUM(umsatz_brutto),0), 2) AS marge_brutto_prozent
                 FROM v_sales
                 WHERE {where_sql}
                 GROUP BY {label_expr}
                 ORDER BY {label_expr}
-                """,
-                params
-            )
+            """, params)
             rows = cur.fetchall()
-
         conn.close()
 
-    # Підсумки
-    if rows:
-        totals = {
-            "positionen": sum(r[1] for r in rows),
-            "menge":      float(sum(r[2] for r in rows)),
-            "rabatt_eur": float(sum(r[3] for r in rows)),
-            "umsatz":     float(sum(r[4] for r in rows)),
-            "kosten":     float(sum(r[5] for r in rows)),
-            "marge":      float(sum(r[6] for r in rows)),
-            "umsatz_br":  float(sum(r[7] for r in rows)),
-            "marge_br":   float(sum(r[8] for r in rows)),
-        }
-    else:
-        totals = {"positionen":0,"menge":0.0,"rabatt_eur":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0,"umsatz_br":0.0,"marge_br":0.0}
+    totals = _totals_from_rows(rows, idx=dict(
+        pos=1, menge=2, rabatt=3, umsatz=4, kosten=5, marge=6, umsatz_br=7, marge_br=8
+    ))
 
-    # Рядок «Gefiltert»: точні назви
-    def labels_for(selected_ids, pairs):
-        id_to_label = {str(pid): lbl for pid, lbl in pairs}
-        names = [id_to_label.get(str(x)) for x in selected_ids if str(x) in id_to_label]
-        if not names: return ""
-        if len(names) <= 6:
-            return ", ".join(names)
-        return ", ".join(names[:6]) + f" … (+{len(names)-6})"
-
-    kunden_txt    = labels_for(kunden_sel, kunden_list if 'kunden_list' in locals() else [])
-    kundentyp_txt = labels_for(kundentyp_sel, kundentyp_list if 'kundentyp_list' in locals() else [])
-    artikel_txt   = labels_for(artikel_sel, artikel_list if 'artikel_list' in locals() else [])
-
+    # Лінія "Gefiltert → ... "
     parts = [f"von: {von}", f"bis: {bis}", f"Intervall: {grp}"]
-    if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
-    if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
-    if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
+    kz = _labels_for(kunden_sel, kunden_list)
+    kt = _labels_for(kundentyp_sel, kundentyp_list)
+    az = _labels_for(artikel_sel, artikel_list)
+    if kz: parts.append(f"Kunde: {kz}")
+    if kt: parts.append(f"Kundentyp: {kt}")
+    if az: parts.append(f"Artikel: {az}")
     filter_line = "Gefiltert → " + " · ".join(parts)
 
     return render_template(
@@ -260,68 +282,40 @@ def report_daily():
         title=f"Umsatz pro {grp}",
         rows=rows, totals=totals,
         von=von, bis=bis, grp=grp,
-        kunden_list=kunden_list if 'kunden_list' in locals() else [],
-        artikel_list=artikel_list if 'artikel_list' in locals() else [],
-        kundentyp_list=kundentyp_list if 'kundentyp_list' in locals() else [],
+        kunden_list=kunden_list, artikel_list=artikel_list, kundentyp_list=kundentyp_list,
         kunden_sel=kunden_sel, artikel_sel=artikel_sel, kundentyp_sel=kundentyp_sel,
         filter_line=filter_line,
     )
 
-
-# ─ Звіт: Umsatz pro Kunde ─
+# ─────────────────────────────
+# Звіт: Umsatz pro Kunde (Top-N)
+# ─────────────────────────────
 @app.get("/reports/customers")
 @login_required
 def report_customers():
-    from datetime import date, timedelta
+    von, bis = _dates_from_args()
+    kunden_sel = _multi("kunden")
+    artikel_sel = _multi("artikel")
+    kundentyp_sel = _multi("kundentypen")
 
-    # Параметри
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
-
-    kunden_sel    = request.args.getlist("kunden")
-    artikel_sel   = request.args.getlist("artikel")
-    kundentyp_sel = request.args.getlist("kundentypen")
-
-    # top_n (кількість у топі для графіка/таблиці)
     try:
         top_n = int(request.args.get("top", "20"))
     except ValueError:
         top_n = 20
-    top_n = max(5, min(top_n, 100))  # 5..100
+    top_n = max(5, min(top_n, 100))
 
     rows = []
-    filter_line = ""
-    totals = {}
+    kunden_list = []
+    kundentyp_list = []
+    artikel_list = []
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            # довідники
-            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
-            kunden_list = cur.fetchall()
+            kunden_list, kundentyp_list, artikel_list = _fetch_lookups(cur)
+            where_sql, params = _build_where(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
 
-            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
-            kundentyp_list = cur.fetchall()
-
-            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
-            artikel_list = cur.fetchall()
-
-            # WHERE
-            where_sql = "verkaufsdatum BETWEEN %s AND %s"
-            params = [von, bis]
-
-            if kunden_sel:
-                where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
-                params.extend(kunden_sel)
-            if kundentyp_sel:
-                where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
-                params.extend(kundentyp_sel)
-            if artikel_sel:
-                where_sql += " AND artikelID IN (" + ",".join(["%s"] * len(artikel_sel)) + ")"
-                params.extend(artikel_sel)
-
-            # Групування по клієнту (зважена маржа %)
-            sql = f"""
+            cur.execute(f"""
                 SELECT
                   kundenID,
                   kunde,
@@ -336,40 +330,21 @@ def report_customers():
                 GROUP BY kundenID, kunde
                 ORDER BY umsatz DESC
                 LIMIT {top_n}
-            """
-            cur.execute(sql, params)
+            """, params)
             rows = cur.fetchall()
-
         conn.close()
 
-    # Підсумки
-    if rows:
-        totals = {
-            "positionen": sum(r[2] for r in rows),
-            "menge":      float(sum(r[3] for r in rows)),
-            "umsatz":     float(sum(r[4] for r in rows)),
-            "kosten":     float(sum(r[5] for r in rows)),
-            "marge":      float(sum(r[6] for r in rows)),
-        }
-    else:
-        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
-
-    # Рядок “Gefiltert”
-    def labels_for(selected_ids, pairs):
-        m = {str(i): n for i, n in pairs}
-        names = [m.get(str(x)) for x in selected_ids if str(x) in m]
-        if not names: return ""
-        if len(names) <= 6: return ", ".join(names)
-        return ", ".join(names[:6]) + f" … (+{len(names)-6})"
-
-    kunden_txt    = labels_for(kunden_sel, kunden_list if 'kunden_list' in locals() else [])
-    kundentyp_txt = labels_for(kundentyp_sel, kundentyp_list if 'kundentyp_list' in locals() else [])
-    artikel_txt   = labels_for(artikel_sel, artikel_list if 'artikel_list' in locals() else [])
+    totals = _totals_from_rows(rows, idx=dict(
+        pos=2, menge=3, umsatz=4, kosten=5, marge=6
+    ))
 
     parts = [f"von: {von}", f"bis: {bis}", f"Top: {top_n}"]
-    if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
-    if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
-    if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
+    kz = _labels_for(kunden_sel, kunden_list)
+    kt = _labels_for(kundentyp_sel, kundentyp_list)
+    az = _labels_for(artikel_sel, artikel_list)
+    if kz: parts.append(f"Kunde: {kz}")
+    if kt: parts.append(f"Kundentyp: {kt}")
+    if az: parts.append(f"Artikel: {az}")
     filter_line = "Gefiltert → " + " · ".join(parts)
 
     return render_template(
@@ -377,26 +352,22 @@ def report_customers():
         title="Umsatz pro Kunde",
         rows=rows, totals=totals,
         von=von, bis=bis, top_n=top_n,
-        kunden_list=kunden_list if 'kunden_list' in locals() else [],
-        artikel_list=artikel_list if 'artikel_list' in locals() else [],
-        kundentyp_list=kundentyp_list if 'kundentyp_list' in locals() else [],
+        kunden_list=kunden_list, artikel_list=artikel_list, kundentyp_list=kundentyp_list,
         kunden_sel=kunden_sel, artikel_sel=artikel_sel, kundentyp_sel=kundentyp_sel,
         filter_line=filter_line,
     )
 
-# ─ Звіт: Umsatz pro Artikel ─
+# ─────────────────────────────
+# Звіт: Umsatz pro Artikel (Top-N або часовий ряд)
+# ─────────────────────────────
 @app.get("/reports/articles")
 @login_required
 def report_articles():
-    from datetime import date, timedelta
-
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
-
-    artikel_sel   = request.args.getlist("artikel")
-    kunden_sel    = request.args.getlist("kunden")
-    kundentyp_sel = request.args.getlist("kundentypen")
-    grp = request.args.get("grp", "items")  # items | day | month | year
+    von, bis = _dates_from_args()
+    artikel_sel = _multi("artikel")
+    kunden_sel = _multi("kunden")
+    kundentyp_sel = _multi("kundentypen")
+    grp_req = request.args.get("grp", "items")  # items | day | month | year
 
     try:
         top_n = int(request.args.get("top", "20"))
@@ -405,14 +376,16 @@ def report_articles():
     top_n = max(5, min(top_n, 100))
 
     rows = []
-    totals = {}
-    filter_line = ""
-    ts_mode_msg = None   # повідомлення, якщо часовий режим неможливий
+    artikel_list = []
+    kunden_list = []
+    kundentyp_list = []
+    ts_mode_msg = None
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            # Довідники
+            artikel_list, kunden_list, kundentyp_list = None, None, None
+            # довідники
             cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname")
             artikel_list = cur.fetchall()
             cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) FROM kunden ORDER BY 2")
@@ -420,7 +393,6 @@ def report_articles():
             cur.execute("SELECT kundentypID, bezeichnung FROM kundentyp ORDER BY bezeichnung")
             kundentyp_list = cur.fetchall()
 
-            # WHERE
             where_sql = "verkaufsdatum BETWEEN %s AND %s"
             params = [von, bis]
             if artikel_sel:
@@ -433,9 +405,8 @@ def report_articles():
                 where_sql += " AND kundentypID IN (" + ",".join(["%s"] * len(kundentyp_sel)) + ")"
                 params.extend(kundentyp_sel)
 
-            if grp == "items":
-                # ---- звичайний Top-N по артикулах ----
-                sql = f"""
+            if grp_req == "items":
+                cur.execute(f"""
                     SELECT
                       artikelID,
                       artikel,
@@ -450,24 +421,18 @@ def report_articles():
                     GROUP BY artikelID, artikel
                     ORDER BY umsatz DESC
                     LIMIT {top_n}
-                """
-                cur.execute(sql, params)
+                """, params)
                 rows = cur.fetchall()
-
+                grp = "items"
             else:
-                # ---- часовий ряд для 1 вибраного артикула ----
+                # часовий ряд — рівно один артикул
                 if len(artikel_sel) != 1:
                     ts_mode_msg = "Bitte genau einen Artikel wählen, um einen Zeitverlauf anzuzeigen."
+                    grp = "items"  # формально
                 else:
-                    if grp == "month":
-                        label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y-%%m')"
-                    elif grp == "year":
-                        label_expr = "DATE_FORMAT(verkaufsdatum, '%%Y')"
-                    else:
-                        grp = "day"
-                        label_expr = "DATE(verkaufsdatum)"
-
-                    sql = f"""
+                    label_expr, grp = _group_expr(grp_req, "verkaufsdatum")
+                    params_ts = params + [artikel_sel[0]]
+                    cur.execute(f"""
                         SELECT
                           {label_expr}                       AS label,
                           COUNT(*)                           AS positionen,
@@ -481,63 +446,40 @@ def report_articles():
                           AND artikelID = %s
                         GROUP BY label
                         ORDER BY label
-                    """
-                    params_ts = params + [artikel_sel[0]]
-                    cur.execute(sql, params_ts)
+                    """, params_ts)
                     rows = cur.fetchall()
 
         conn.close()
 
-    # Підсумки (ті самі поля, але різні індекси для items vs ts не потрібні — ми узгодили колонки)
-    if rows:
-        # для items: rows = [id, name, pos, menge, umsatz, kosten, marge, marge%]
-        # для ts:    rows = [label, pos, menge, umsatz, kosten, marge, marge%]
-        pos_idx = 2 if grp == "items" else 1
-        menge_idx = 3 if grp == "items" else 2
-        umsatz_idx = 4 if grp == "items" else 3
-        kosten_idx = 5 if grp == "items" else 4
-        marge_idx  = 6 if grp == "items" else 5
-
-        totals = {
-            "positionen": sum(r[pos_idx] for r in rows),
-            "menge":      float(sum(r[menge_idx] for r in rows)),
-            "umsatz":     float(sum(r[umsatz_idx] for r in rows)),
-            "kosten":     float(sum(r[kosten_idx] for r in rows)),
-            "marge":      float(sum(r[marge_idx]  for r in rows)),
-        }
+    # Підсумки (уніфіковані індекси)
+    if grp_req == "items":
+        idx = dict(pos=2, menge=3, umsatz=4, kosten=5, marge=6)
     else:
-        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
+        idx = dict(pos=1, menge=2, umsatz=3, kosten=4, marge=5)
+    totals = _totals_from_rows(rows, idx=idx)
 
-    # Рядок фільтра
-    def labels_for(selected, pairs):
-        m={str(i):n for i,n in pairs}
-        names=[m.get(str(x)) for x in selected if str(x) in m]
-        if not names:return""
-        if len(names)<=6:return", ".join(names)
-        return", ".join(names[:6])+f" … (+{len(names)-6})"
-
-    artikel_txt   = labels_for(artikel_sel, artikel_list if 'artikel_list' in locals() else [])
-    kunden_txt    = labels_for(kunden_sel, kunden_list if 'kunden_list' in locals() else [])
-    kundentyp_txt = labels_for(kundentyp_sel, kundentyp_list if 'kundentyp_list' in locals() else [])
-
-    parts=[f"von: {von}", f"bis: {bis}", f"Modus: {'Artikel' if grp=='items' else grp}"]
-    if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
-    if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
-    if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
+    parts=[f"von: {von}", f"bis: {bis}", f"Modus: {'Artikel' if grp_req=='items' else grp_req}"]
+    az = _labels_for(artikel_sel, artikel_list)
+    kz = _labels_for(kunden_sel, kunden_list)
+    kt = _labels_for(kundentyp_sel, kundentyp_list)
+    if az: parts.append(f"Artikel: {az}")
+    if kz: parts.append(f"Kunde: {kz}")
+    if kt: parts.append(f"Kundentyp: {kt}")
     filter_line="Gefiltert → "+" · ".join(parts)
 
     return render_template(
         "reports_articles.html",
         title="Umsatz pro Artikel",
         rows=rows, totals=totals,
-        von=von, bis=bis, top_n=top_n, grp=grp,
-        artikel_list=artikel_list if 'artikel_list' in locals() else [],
-        kunden_list=kunden_list if 'kunden_list' in locals() else [],
-        kundentyp_list=kundentyp_list if 'kundentyp_list' in locals() else [],
+        von=von, bis=bis, top_n=top_n, grp=grp_req,
+        artikel_list=artikel_list or [], kunden_list=kunden_list or [], kundentyp_list=kundentyp_list or [],
         artikel_sel=artikel_sel, kunden_sel=kunden_sel, kundentyp_sel=kundentyp_sel,
         filter_line=filter_line, ts_mode_msg=ts_mode_msg,
     )
 
+# ─────────────────────────────
+# Звіт: Низький склад
+# ─────────────────────────────
 @app.get("/reports/stock_low")
 @login_required
 def report_stock_low():
@@ -551,8 +493,7 @@ def report_stock_low():
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT
                   artikelID,
                   produktname AS artikel,
@@ -562,9 +503,7 @@ def report_stock_low():
                 FROM artikel
                 WHERE lagerbestand < %s
                 ORDER BY lagerbestand ASC
-                """,
-                (threshold, threshold, threshold)
-            )
+            """, (threshold, threshold, threshold))
             rows = cur.fetchall()
         conn.close()
 
@@ -574,7 +513,7 @@ def report_stock_low():
         rows=rows, threshold=threshold
     )
 
-
+# ─────────────────────────────
 @app.get("/health")
 def health():
     return {"status": "ok"}
