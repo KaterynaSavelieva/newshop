@@ -67,9 +67,9 @@ def _group_expr(grp: str, col: str):
     grp in {"day","month","year"}
     """
     if grp == "month":
-        return "DATE_FORMAT(%s, '%%Y-%%m')" % col, "month"
+        return "DATE_FORMAT(%s, '%Y-%m')" % col, "month"
     if grp == "year":
-        return "DATE_FORMAT(%s, '%%Y')" % col, "year"
+        return "DATE_FORMAT(%s, '%Y')" % col, "year"
     return "DATE(%s)" % col, "day"
 
 def _build_where(von, bis, kunden_sel, kundentyp_sel, artikel_sel):
@@ -240,7 +240,7 @@ def report_daily():
         with conn.cursor() as cur:
             kunden_list, kundentyp_list, artikel_list = _fetch_lookups(cur)
             where_sql, params = _build_where(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
-            label_expr, grp = _group_expr(grp_req, "verkaufsdatum")
+            label_expr, extra, grp = _group_expr(grp_req, "verkaufsdatum")
 
             cur.execute(f"""
                 SELECT
@@ -259,7 +259,7 @@ def report_daily():
                 WHERE {where_sql}
                 GROUP BY {label_expr}
                 ORDER BY {label_expr}
-            """, params)
+            """, params + extra)
             rows = cur.fetchall()
         conn.close()
 
@@ -430,8 +430,8 @@ def report_articles():
                     ts_mode_msg = "Bitte genau einen Artikel wählen, um einen Zeitverlauf anzuzeigen."
                     grp = "items"  # формально
                 else:
-                    label_expr, grp = _group_expr(grp_req, "verkaufsdatum")
-                    params_ts = params + [artikel_sel[0]]
+                    label_expr, extra, _grp = _group_expr(grp_req, "verkaufsdatum")
+                    params_ts = params + extra + [artikel_sel[0]]
                     cur.execute(f"""
                         SELECT
                           {label_expr}                       AS label,
