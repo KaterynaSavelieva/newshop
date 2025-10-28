@@ -58,7 +58,7 @@
 
         <div class="col-md-2 d-flex align-items-end justify-content-end gap-2 action-bar">
             <button class="btn btn-primary" type="submit">Filtern</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('report_articles') }}">Zurücksetzen</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_articles') }}">Zurücksetzen</a>
         </div>
     </div>
 
@@ -109,7 +109,7 @@
 
     <div class="d-flex justify-content-end gap-2 mt-3">
         <button class="btn btn-primary" type="submit">Filtern</button>
-        <a class="btn btn-outline-secondary" href="{{ url_for('report_articles') }}">Zurücksetzen</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_articles') }}">Zurücksetzen</a>
     </div>
 </form>
 
@@ -243,7 +243,7 @@
   // Клавіші: Ctrl+Enter = фільтр, Escape = скинути
   document.addEventListener('keydown',(e)=>{
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ document.querySelector('form.filters').submit(); }
-    if(e.key==='Escape'){ window.location="{{ url_for('report_articles') }}"; }
+    if(e.key==='Escape'){ window.location="{{ url_for('reports.report_articles') }}"; }
   });
 </script>
 
