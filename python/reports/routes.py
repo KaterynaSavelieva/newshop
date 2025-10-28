@@ -289,3 +289,39 @@ def report_articles():
         artikel_sel=artikel_sel, kunden_sel=kunden_sel, kundentyp_sel=kundentyp_sel,
         filter_line=filter_line, ts_mode_msg=ts_mode_msg,
     )
+
+@reports_bp.get("/reports/stock_low")
+@login_required
+def report_stock_low():
+    threshold = request.args.get("limit", "150")
+    try:
+        threshold = int(threshold)
+    except ValueError:
+        threshold = 150
+
+    rows = []
+    conn = get_conn()
+    if conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  artikelID,
+                  produktname AS artikel,
+                  lagerbestand,
+                  %s AS schwelle,
+                  lagerbestand - %s AS differenz
+                FROM artikel
+                WHERE lagerbestand < %s
+                ORDER BY lagerbestand ASC
+                """,
+                (threshold, threshold, threshold)
+            )
+            rows = cur.fetchall()
+        conn.close()
+
+    return render_template(
+        "reports_stock_low.html",
+        title="Lagerwarnung / Artikel mit niedrigem Bestand",
+        rows=rows, threshold=threshold
+    )

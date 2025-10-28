@@ -45,6 +45,11 @@
                         <a class="nav-link {% if request.endpoint == 'reports.report_articles' %}active{% endif %}"
                            href="{{ url_for('reports.report_articles') }}">Umsatz pro Artikel</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'stock_low' in request.endpoint %}active{% endif %}"
+                           href="{{ url_for('reports.report_stock_low') }}">Lagerwarnung</a>
+                    </li>
+
                 </ul>
 
                 {% if current_user.is_authenticated %}
