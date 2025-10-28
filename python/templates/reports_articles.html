@@ -107,11 +107,6 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-primary" type="submit">Filtern</button>
-        <a class="btn btn-outline-secondary" href="{{ url_for('report_articles') }}">Zurücksetzen</a>
-    </div>
-</form>
 
 {% if filter_line %}
 <div class="alert alert-light border py-2 mt-3">{{ filter_line|safe }}</div>
