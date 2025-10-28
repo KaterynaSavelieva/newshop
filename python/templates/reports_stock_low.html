@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Lagerwarnung / Artikel mit niedrigem Bestand{% endblock %}
+
+{% block content %}
+
+<style>
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 1100px;
+    height: 360px;
+    margin: 0 auto;
+  }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h3 class="mb-0">Lagerwarnung / Artikel mit niedrigem Bestand</h3>
+</div>
+
+<!-- 🔎 Фільтри -->
+<form class="filters" method="get" action="{{ url_for('report_stock_low') }}">
+  <div class="row g-3 mb-3">
+    <div class="col-sm-3 col-md-2">
+      <label class="form-label">Schwellenwert (Stück)</label>
+      <input type="number" name="limit" min="0" step="1" value="{{ threshold }}" class="form-control">
+    </div>
+    <div class="col-sm-4 col-md-3 d-flex align-items-end">
+      <button class="btn btn-primary me-2" type="submit">Filtern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('report_stock_low') }}">Zurücksetzen</a>
+    </div>
+  </div>
+</form>
+
+<!-- 🧾 Рядок “що відфільтровано” -->
+<div class="alert alert-light border py-2 mb-3">
+  Gefiltert → <span class="badge bg-secondary">Schwelle: {{ threshold }}</span>
+  {% if rows %}<span class="badge bg-info text-dark ms-2">Treffer: {{ rows|length }}</span>{% endif %}
+</div>
+
+{% if not rows %}
+  <div class="alert alert-success">
+    ✅ Keine Artikel unter dem Schwellenwert gefunden.
+  </div>
+{% else %}
+
+<!-- 📈 Графік -->
+<div class="card mb-3">
+  <div class="card-header py-2">Bestand je Artikel (rot = unter Schwelle)</div>
+  <div class="card-body">
+    <div class="chart-wrap">
+      <canvas id="stockChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- 📋 Таблиця -->
+<div class="table-responsive">
+  <table class="table table-sm table-striped table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th style="width:56px">#</th>
+        <th>Artikel</th>
+        <th class="text-end">Lagerbestand</th>
+        <th class="text-end">Schwelle</th>
+        <th class="text-end">Differenz</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      {# r: [0]=artikelID, [1]=artikel, [2]=lagerbestand, [3]=schwelle, [4]=differenz #}
+      <tr class="{% if r[2] < threshold %}table-warning{% endif %}">
+        <td>{{ loop.index }}</td>
+        <td>{{ r[1] }}</td>
+        <td class="text-end">{{ r[2] }}</td>
+        <td class="text-end">{{ threshold }}</td>
+        <td class="text-end">{{ r[4] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="table-light">
+      <tr>
+        <th colspan="2">Summe</th>
+        <th class="text-end">
+          {{ rows|map(attribute=2)|sum }}
+        </th>
+        <th class="text-end">{{ threshold }}</th>
+        <th class="text-end">
+          {{ rows|map(attribute=4)|sum }}
+        </th>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<script>
+  // Дані з сервера
+  const labels   = {{ rows|map(attribute=1)|list|tojson }};  // артикули
+  const stocks   = {{ rows|map(attribute=2)|list|tojson }};  // залишок
+  const threshold = {{ threshold|int }};
+
+  // Кольори: червоний якщо < порогу, інакше базовий
+  const colors = stocks.map(v => v < threshold ? 'rgba(220, 53, 69, 0.6)' : 'rgba(13, 110, 253, 0.6)');
+  const borders = stocks.map(v => v < threshold ? 'rgba(220, 53, 69, 1)'   : 'rgba(13, 110, 253, 1)');
+
+  const ctx = document.getElementById('stockChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Lagerbestand (Stück)',
+          data: stocks,
+          backgroundColor: colors,
+          borderColor: borders,
+          borderWidth: 1,
+          yAxisID: 'yLeft'
+        },
+        {
+          type: 'line',
+          label: 'Schwelle',
+          data: labels.map(_ => threshold),
+          yAxisID: 'yLeft',
+          borderWidth: 2,
+          borderDash: [6, 6],
+          fill: false,
+          pointRadius: 0,
+          tension: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        yLeft: {
+          beginAtZero: true,
+          position: 'left',
+          title: { display: true, text: 'Stück' }
+        },
+        x: {
+          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 20 }
+        }
+      },
+      plugins: {
+        legend: { display: true }
+      }
+    }
+  });
+</script>
+
+{% endif %}
+{% endblock %}

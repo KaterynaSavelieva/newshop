@@ -9,8 +9,8 @@ from datetime import datetime
 from db import get_conn
 
 def fetch_low_stock(cur):
-    # товари з запасом < 20
-    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 25;")
+    # товари з запасом < 100
+    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 100;")
     return cur.fetchall()  # [(artikelID, name, bestand), ...]
 
 def pick_random_supplier(cur, artikel_id):
@@ -42,14 +42,14 @@ def add_item(cur, einkauf_id, artikel_id, menge, preis):
 def main():
     conn = get_conn()
     if not conn:
-        print("❌ Немає підключення до БД.")
+        print("Keine Verbindung zur Datenbank")
         return
 
     try:
         with conn.cursor() as cur:
             low = fetch_low_stock(cur)
             if not low:
-                print("ℹ️ Немає товарів з запасом < 20. Закупка не потрібна.")
+                print("Es gibt keine Produkte mit einem Lagerbestand von < 100. Kein Kauf erforderlich.")
                 return
 
             # згрупуємо товари за постачальником: {lieferantID: [(artikelID, menge, preis), ...]}
@@ -62,11 +62,11 @@ def main():
                     skipped.append((artikel_id, name))
                     continue
                 lieferant_id, preis = sup
-                menge = random.randint(30, 80)  # 1B: випадково 30..80
+                menge = random.randint(25, 120)  # випадково 25-120
                 plan.setdefault(lieferant_id, []).append((artikel_id, menge, preis))
 
             if not plan:
-                print("⚠️ Немає жодного доступного постачальника для потрібних товарів.")
+                print("Für die benötigten Produkte sind keine Lieferanten verfügbar")
                 return
 
             created = []
@@ -79,13 +79,13 @@ def main():
         conn.commit()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for eid, lid, n in created:
-            print(f"✅ [{now}] Закупка створена: einkaufID={eid}, постачальник={lid}, позицій={n}")
+            print(f"[{now}] Einkauf erstellt: einkaufID={eid}, Lieferant={lid}, menge={n}")
         if skipped:
-            print("⚠️ Пропущені (нема прив'язки в artikellieferant):",
+            print("Lieferant hat diesen Artikel nicht:",
                   ", ".join(f"{aid}" for aid, _ in skipped))
     except Exception as e:
         conn.rollback()
-        print(f"❌ Помилка, транзакцію скасовано: {e}")
+        print(f"Fehler, Transaktion abgebrochen: {e}")
     finally:
         conn.close()
 
