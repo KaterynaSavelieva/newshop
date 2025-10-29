@@ -1,35 +1,15 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
-from flask_login import (
-    LoginManager, UserMixin, login_user, logout_user,
-    login_required, current_user
-)
+from flask import Blueprint, render_template, redirect, url_for, flash
+from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
 from werkzeug.security import check_password_hash
 from ..db import get_conn
 
 auth_bp = Blueprint("auth", __name__)
 
-# ── Модель користувача ──
-class User(UserMixin):
-    def __init__(self, id, email, name, role, is_active):
-        self.id = str(id)
-        self.email = email
-        self.name = name
-        self.role = role
-        self.active = bool(is_active)
-
-    def is_active(self):
-        return self.active
-
-# login_manager створюється в app і "під’єднується" тут через ініціалізатор
-login_manager: LoginManager | None = None
-login_manager.login_view = "auth.login"
-login_manager.login_message = None            # вимкнути автосповіщення
-# (необов'язково) login_manager.needs_refresh_message = None
-
-
-def init_auth(app_login_manager: LoginManager):
-    global login_manager
-    login_manager = app_login_manager
+def init_auth(login_manager: LoginManager):
+    # УВЕСЬ код, що налаштовує login_manager — лише тут!
+    login_manager.login_view = "auth.login"
+    login_manager.login_message = "Please log in to access this page."
+    login_manager.login_message_category = "warning"
 
     @login_manager.user_loader
     def load_user(user_id: str):
@@ -37,14 +17,20 @@ def init_auth(app_login_manager: LoginManager):
         if not conn:
             return None
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, email, name, role, is_active FROM users WHERE id=%s",
-                (user_id,)
-            )
+            cur.execute("SELECT id, email, name, role, is_active FROM users WHERE id=%s", (user_id,))
             row = cur.fetchone()
         conn.close()
         if not row:
             return None
+        # невеличка локальна модель
+        class User(UserMixin):
+            def __init__(self, id, email, name, role, is_active):
+                self.id = str(id)
+                self.email = email
+                self.name = name
+                self.role = role
+                self.active = bool(is_active)
+            def is_active(self): return self.active
         return User(*row)
 
 # ── Роути ──

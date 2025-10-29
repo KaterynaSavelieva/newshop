@@ -12,7 +12,6 @@ app.secret_key = os.getenv("FLASK_SECRET", "dev")
 
 # ─ Flask-Login ─
 login_manager = LoginManager(app)
-login_manager.login_view = "auth.login"
 init_auth(login_manager)   # <- передаємо login_manager в модуль auth
 
 # ─ Blueprints ─
