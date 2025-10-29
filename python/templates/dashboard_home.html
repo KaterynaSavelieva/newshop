@@ -1,28 +1,26 @@
 {% extends "base.html" %}
-{% block title %}NewShop – Dashboard{% endblock %}
-
+{% block title %}NewShop Dashboard{% endblock %}
 {% block content %}
-<div class="text-center mt-5">
-  <!-- 🏪 Логотип магазину -->
-  <img src="{{ url_for('static', filename='img/shop_logo.png') }}"
-       alt="Logo" class="img-fluid"
-       style="max-width: 220px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
 
-  <!-- 🧭 Назва магазину -->
-  <h1 class="mt-4 fw-bold">Willkommen bei <span class="text-primary">NewShop</span></h1>
-  <p class="lead text-muted">Ihr digitales Dashboard für Verkaufs- und Lageranalyse</p>
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4 text-center">
+        <img src="{{ url_for('static', filename='img/shop_logo.png') }}"
+             alt="Logo" class="img-fluid mb-3" style="max-height:160px">
+        <h2 class="mb-2">NewShop</h2>
+        <p class="text-muted mb-4">Demo Dashboard – Verkaufs- und Lager-Insights</p>
 
-  <!-- 🔘 Кнопки переходу -->
-  <div class="mt-5">
-    <a href="{{ url_for('reports.report_daily') }}" class="btn btn-outline-primary btn-lg m-2">
-      📊 Umsatz pro Tag
-    </a>
-    <a href="{{ url_for('reports.report_articles') }}" class="btn btn-outline-success btn-lg m-2">
-      🛍️ Artikelübersicht
-    </a>
-    <a href="{{ url_for('reports.report_turnover') }}" class="btn btn-outline-info btn-lg m-2">
-      🔄 Umschlag 90 Tage
-    </a>
+        <div class="d-flex flex-wrap gap-2 justify-content-center">
+          <a class="btn btn-primary" href="{{ url_for('reports.report_daily') }}">Umsatz pro Tag</a>
+          <a class="btn btn-outline-primary" href="{{ url_for('reports.report_customers') }}">Umsatz pro Kunde</a>
+          <a class="btn btn-outline-primary" href="{{ url_for('reports.report_articles') }}">Umsatz pro Artikel</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_stock_low') }}">Lagerwarnung</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_turnover') }}">Umschlag 90 Tag</a>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
 {% endblock %}

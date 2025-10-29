@@ -23,52 +23,63 @@
 <body>
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
-            <a class="navbar-brand fw-semibold" href="{{ url_for('index') }}">NewShop</a>
+            <a class="navbar-brand fw-semibold" href="{{ url_for('dashboard.home') }}">NewShop</a>
 
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="nav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard.home') }}">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
-                           href="{{ url_for('index') }}">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'reports.report_daily' %}active{% endif %}"
-                           href="{{ url_for('reports.report_daily') }}">Umsatz pro Tag</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'reports.report_customers' %}active{% endif %}"
-                           href="{{ url_for('reports.report_customers') }}">Umsatz pro Kunde</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'reports.report_articles' %}active{% endif %}"
-                           href="{{ url_for('reports.report_articles') }}">Umsatz pro Artikel</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'stock_low' in request.endpoint %}active{% endif %}"
-                           href="{{ url_for('reports.report_stock_low') }}">Lagerwarnung</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'reports.report_turnover' %}active{% endif %}"
-                           href="{{ url_for('reports.report_turnover') }}">Umschlag 90 Tag</a>
-                    </li>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
 
-                </ul>
+        <div class="collapse navbar-collapse" id="nav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'dashboard.home' %}active{% endif %}"
+                 href="{{ url_for('dashboard.home') }}">
+                Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.report_daily' %}active{% endif %}"
+                 href="{{ url_for('reports.report_daily') }}">
+                Umsatz pro Tag
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.report_customers' %}active{% endif %}"
+                 href="{{ url_for('reports.report_customers') }}">
+                Umsatz pro Kunde
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.report_articles' %}active{% endif %}"
+                 href="{{ url_for('reports.report_articles') }}">
+                Umsatz pro Artikel
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if 'stock_low' in request.endpoint %}active{% endif %}"
+                 href="{{ url_for('reports.report_stock_low') }}">
+                Lagerwarnung
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.report_turnover' %}active{% endif %}"
+                 href="{{ url_for('reports.report_turnover') }}">
+                Umschlag 90 Tag
+              </a>
+            </li>
+          </ul>
 
-                {% if current_user.is_authenticated %}
-                <span class="text-muted small me-3">{{ current_user.name or current_user.email }}</span>
-                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('auth.logout') }}">Abmelden</a>
-                {% else %}
-                <a class="btn btn-primary btn-sm" href="{{ url_for('auth.login') }}">Anmelden</a>
-                {% endif %}
-            </div>
+          {% if current_user.is_authenticated %}
+            <span class="text-muted small me-3">{{ current_user.name or current_user.email }}</span>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('auth.logout') }}">Abmelden</a>
+          {% else %}
+            <a class="btn btn-primary btn-sm" href="{{ url_for('auth.login') }}">Anmelden</a>
+          {% endif %}
         </div>
+      </div>
     </nav>
+
+
 
     <main class="container py-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
