@@ -326,9 +326,8 @@ def report_stock_low():
         rows=rows, threshold=threshold
     )
 
-# routes.py
-import json
 
+import json
 @reports_bp.get("/turnover")
 @login_required
 def report_turnover():
@@ -345,12 +344,12 @@ def report_turnover():
                     lagerwert_now,      -- 4
                     min_einkaufspreis,  -- 5
                     max_einkaufspreis,  -- 6
-                    verkaufsmenge_90,   -- 7   <-- якщо у в’ю це поле інакше назване — виправ тут
+                    verkaufsmenge_90,   -- 7   
                     cogs_90,            -- 8
                     umschlag_90_approx, -- 9
                     lagerdauer_tage     -- 10
                 FROM v_umschlag_90tage
-                ORDER BY umschlag_90_approx DESC, lagerdauer_tage ASC
+                ORDER BY umschlag_90_approx ASC, lagerdauer_tage ASC
             """)
             rows = cur.fetchall()
         conn.close()
