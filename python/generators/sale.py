@@ -1,37 +1,64 @@
 # sale.py
 """
-Генерація ОДНОГО продажу за правилами:
-- ціна одиниці = artikelpreis.listenpreis, актуальна на дату продажу
-- 1–5 позицій у чеку; для кожної позиції кількість 1–5 (але не більше наявного складу)
-- беруться тільки товари з lagerbestand > 0
-- застосовується знижка клієнта (kundenrabatt) — пишемо у поле 'rabatt' як %
-- тригери самі списують склад та валідуть кількість
+Генерація ОДНОГО продажу з діапазонами, що залежать від типу клієнта:
+Standard →   menge 1–25,   max_items 1–50
+Silber   →   menge 1–50,   max_items 1–25
+Gold     →   menge 1–100,  max_items 1–100
+Platin   →   menge 1–150,  max_items 1–150
 """
 
 import random
 from datetime import datetime
 from db import get_conn
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Допоміжні
+# ──────────────────────────────────────────────────────────────────────────────
+
+def ranges_for_type(kundentyp: str):
+    """Повертає ((min_menge, max_menge), (min_items, max_items)) для заданого типу."""
+    t = (kundentyp or "Standard").strip().lower()
+    if t == "standard":
+        return (1, 25), (1, 50)
+    if t == "silber":
+        return (1, 50), (1, 25)
+    if t == "gold":
+        return (1, 100), (1, 100)
+    if t == "platin":
+        return (1, 150), (1, 150)
+    # дефолт — як Standard
+    return (1, 25), (1, 50)
+
+
 def pick_customer(cur):
-    # вибираємо випадкового клієнта і його знижку
+    """
+    Вибираємо випадкового клієнта, його знижку та тип.
+    Повертає: (kundenID, rabatt_pct, kundentyp_name)
+    """
     cur.execute("""
-        SELECT k.kundenID, COALESCE(t.kundenrabatt,0)
+        SELECT k.kundenID,
+               COALESCE(t.kundenrabatt, 0)  AS rabatt,
+               COALESCE(t.bezeichnung, 'Standard') AS typ
         FROM kunden k
         LEFT JOIN kundentyp t ON t.kundentypID = k.kundentypID
-        ORDER BY RAND() LIMIT 1;
+        ORDER BY RAND()
+        LIMIT 1;
     """)
     row = cur.fetchone()
     if not row:
         raise RuntimeError("У таблиці 'kunden' немає даних.")
-    return row[0], float(row[1])
+    return row[0], float(row[1]), str(row[2])
+
 
 def create_sale_header(cur, kunden_id, when=None):
     when = when or datetime.now()
     cur.execute("INSERT INTO verkauf(kundenID, verkaufsdatum) VALUES(%s, %s);", (kunden_id, when))
     return cur.lastrowid, when
 
+
 def pick_articles_with_stock(cur, max_items=5):
-    # беремо довільні товари з наявним залишком
+    """Беремо випадкові товари з наявним залишком."""
     cur.execute("""
         SELECT artikelID, lagerbestand
         FROM artikel
@@ -41,8 +68,9 @@ def pick_articles_with_stock(cur, max_items=5):
     """, (max_items,))
     return cur.fetchall()  # [(artikelID, lagerbestand), ...]
 
+
 def get_listenpreis(cur, artikel_id, when):
-    # актуальна ціна з artikelpreis на момент 'when'
+    """Актуальна ціна з artikelpreis на момент 'when'."""
     cur.execute("""
         SELECT listenpreis
         FROM artikelpreis
@@ -57,32 +85,44 @@ def get_listenpreis(cur, artikel_id, when):
         raise RuntimeError(f"Немає прайс-рядка в 'artikelpreis' для artikelID={artikel_id} на дату {when}.")
     return float(row[0])
 
-def add_sale_items(cur, verkauf_id, items, when, rabatt_pct):
+
+def add_sale_items(cur, verkauf_id, items, when, rabatt_pct, menge_range):
     """
+    Додає позиції у продаж.
     items: список (artikelID, lagerbestand)
-    Повертає кількість доданих позицій та суму по чеку (без урах. знижки, бо в таблиці зберігаємо ціну одиниці до знижки).
+    menge_range: (min_menge, max_menge) — залежить від типу клієнта
+    Повертає (added_count, sum_without_rabatt).
     """
     added = 0
     total = 0.0
+    min_m, max_m = menge_range
+
     for artikel_id, stock in items:
-        # кількість 1–25, але не більше stock
         if stock <= 0:
             continue
-        menge = random.randint(1, 25)
-        menge = min(menge, stock)
 
-        # ціна одиниці = listenpreis
+        # кількість в межах типового діапазону, але не більше складу
+        menge = random.randint(min_m, max_m)
+        menge = min(menge, stock)
+        if menge <= 0:
+            continue
+
         preis = get_listenpreis(cur, artikel_id, when)
 
-        # вставляємо рядок продажу; тригер перевірить залишок і спише склад
         cur.execute("""
             INSERT INTO verkaufartikel(verkaufID, artikelID, verkaufsmenge, verkaufspreis, rabatt)
             VALUES (%s, %s, %s, %s, %s);
         """, (verkauf_id, artikel_id, menge, preis, rabatt_pct))
 
         added += 1
-        total += preis * menge  # сума без урахування знижки (аналітику зі знижкою можна рахувати у VIEW/запитах)
+        total += preis * menge
+
     return added, round(total, 2)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Основний сценарій
+# ──────────────────────────────────────────────────────────────────────────────
 
 def main():
     conn = get_conn()
@@ -92,33 +132,39 @@ def main():
 
     try:
         with conn.cursor() as cur:
-            # 1) клієнт і його знижка
-            kunden_id, rabatt_pct = pick_customer(cur)
+            # 1) клієнт: ID, знижка, тип
+            kunden_id, rabatt_pct, kundentyp = pick_customer(cur)
 
-            # 2) шапка продажу
+            # 2) діапазони залежно від типу
+            menge_range, items_range = ranges_for_type(kundentyp)
+
+            # 3) шапка продажу
             verkauf_id, when = create_sale_header(cur, kunden_id)
 
-            # 3) добираємо 1–5 товарів із наявним складом
-            max_items = random.randint(1, 25)
+            # 4) скільки товарів у чеку — залежить від типу
+            max_items = random.randint(*items_range)
             candidates = pick_articles_with_stock(cur, max_items=max_items)
 
             if not candidates:
                 raise RuntimeError("Keine Produkte auf Lager (>0). Verkauf abgebrochen")
 
-            # 4) додаємо позиції
-            added, total = add_sale_items(cur, verkauf_id, candidates, when, rabatt_pct)
+            # 5) додаємо позиції з діапазоном кількості за типом
+            added, total = add_sale_items(cur, verkauf_id, candidates, when, rabatt_pct, menge_range)
 
             if added == 0:
-                # якщо нічого не додали — скасовуємо шапку
                 raise RuntimeError("Keine Artikel hinzugefügt (möglicherweise Lagerbestand=0). Verkauf abgebrochen.")
 
         conn.commit()
-        print(f"Verkauf erstellt:: verkaufID={verkauf_id}, позицій={added}, сума(без знижок)={total}, Kundenrabatt={rabatt_pct}%")
+        print(
+            f"Verkauf erstellt: verkaufID={verkauf_id}, позицій={added}, "
+            f"сума(без знижок)={total}, Kundenrabatt={rabatt_pct}%, Typ={kundentyp}"
+        )
     except Exception as e:
         conn.rollback()
         print(f"Verkauf abgebrochen. Grund: {e}")
     finally:
         conn.close()
+
 
 if __name__ == "__main__":
     main()
