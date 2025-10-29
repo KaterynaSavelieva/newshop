@@ -22,6 +22,10 @@ class User(UserMixin):
 
 # login_manager створюється в app і "під’єднується" тут через ініціалізатор
 login_manager: LoginManager | None = None
+login_manager.login_view = "auth.login"
+login_manager.login_message = None            # вимкнути автосповіщення
+# (необов'язково) login_manager.needs_refresh_message = None
+
 
 def init_auth(app_login_manager: LoginManager):
     global login_manager

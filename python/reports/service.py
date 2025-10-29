@@ -1,4 +1,4 @@
-# reports/service.py
+from datetime import date, timedelta
 
 def f_group_expr(grp: str, column: str) -> str:
     """
@@ -45,8 +45,10 @@ def f_build_where_sql(von: str, bis: str,
     kundentyp_sel = kundentyp_sel or []
     artikel_sel = artikel_sel or []
 
-    where_sql = "verkaufsdatum BETWEEN %s AND %s"
-    params: list = [von, bis]
+    bis_next = (date.fromisoformat(bis) + timedelta(days=1)).isoformat() # зробимо верхню межу виключною
+
+    where_sql = "verkaufsdatum >=%s AND verkaufsdatum <%s"
+    params: list = [von, bis_next]
 
     if kunden_sel:
         where_sql += " AND kundenID IN (" + ",".join(["%s"] * len(kunden_sel)) + ")"
