@@ -76,32 +76,39 @@
 </div>
 
 <script>
-  const labels   = {{ chart_labels|safe }};
-  const bars     = {{ chart_bars|safe }};
-  const cumLine  = {{ chart_cum_line|safe }};
+  // Масиви з Jinja -> JS:
+  const labels  = {{ chart_labels   | tojson }};
+  const bars    = {{ chart_bars     | tojson }};
+  const cumLine = {{ chart_cum_line | tojson }};
 
-  const ctx = document.getElementById('paretoChart');
-  if (window.paretoChart) window.paretoChart.destroy();
+  // Захист від порожніх/некоректних даних
+  if (Array.isArray(labels) && labels.length && Array.isArray(bars) && Array.isArray(cumLine)) {
+    const ctx = document.getElementById('paretoChart').getContext('2d');
+    if (window.paretoChart) window.paretoChart.destroy();
 
-  window.paretoChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        { label: 'Umsatz (€)', data: bars, yAxisID: 'y' },
-        { label: 'Kumulativ (%)', data: cumLine, yAxisID: 'y1', type: 'line' }
-      ]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
-        y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right', grid: { drawOnChartArea: false } }
+    window.paretoChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar',  label: 'Umsatz (€)',     data: bars,    yAxisID: 'y'  },
+          { type: 'line', label: 'Kumulativ (%)',  data: cumLine, yAxisID: 'y1' }
+        ]
       },
-      plugins: { legend: { display: true } }
-    }
-  });
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,      // <-- висота 420px працює
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
+          y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
+                grid: { drawOnChartArea: false } }
+        },
+        plugins: { legend: { display: true } }
+      }
+    });
+  }
 </script>
+
 
 {% endblock %}

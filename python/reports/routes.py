@@ -444,9 +444,9 @@ def report_pareto():
         if cum <= 80.0:
             top80_count = idx
 
-    # дані для графіка (візьмемо перші 25 позицій, щоб не перевантажувати графік)
-    chart_labels   = [d["name"] for d in data[:25]]
-    chart_bars     = [d["umsatz"] for d in data[:25]]
+    # дані для графіка (перші 25)
+    chart_labels = [d["name"] for d in data[:25]]
+    chart_bars = [d["umsatz"] for d in data[:25]]
     chart_cum_line = [d["cum_share"] for d in data[:25]]
 
     return render_template(
@@ -456,7 +456,7 @@ def report_pareto():
         total=round(total, 2),
         top80_count=top80_count,
         rows=data,
-        chart_labels=json.dumps(chart_labels),
-        chart_bars=json.dumps(chart_bars),
-        chart_cum_line=json.dumps(chart_cum_line),
+        chart_labels=chart_labels,  # <-- списки, не JSON-рядки
+        chart_bars=chart_bars,
+        chart_cum_line=chart_cum_line,
     )
