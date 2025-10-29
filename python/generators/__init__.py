@@ -1,2 +1,3 @@
-from .routes import auth_bp, init_auth
-__all__ = ["auth_bp", "init_auth"]
+# python/generators/__init__.py
+__all__ = []
+
