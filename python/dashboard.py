@@ -48,11 +48,11 @@ def table():
 
     return render_template("dashboard.html", rows=rows, totals=totals, title="Dashboard")
 
-# (необов’язково) старий alias, якщо десь залишився:
-@app.get("/dashboard")
-@login_required
-def dashboard_alias():
-    return redirect(url_for("dashboard.table"))
+# # (необов’язково) старий alias, якщо десь залишився:
+# @app.get("/dashboard")
+# @login_required
+# def dashboard_alias():
+#     return redirect(url_for("dashboard.table"))
 
 # Технічний статус
 @app.get("/health")
