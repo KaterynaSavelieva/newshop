@@ -290,7 +290,7 @@ def report_articles():
         filter_line=filter_line, ts_mode_msg=ts_mode_msg,
     )
 
-@reports_bp.get("/reports/stock_low")
+@reports_bp.get("/stock_low")
 @login_required
 def report_stock_low():
     threshold = request.args.get("limit", "150")
@@ -325,13 +325,6 @@ def report_stock_low():
         title="Lagerwarnung / Artikel mit niedrigem Bestand",
         rows=rows, threshold=threshold
     )
-
-# python/reports/routes.py
-from flask import Blueprint, render_template, request
-from flask_login import login_required
-from ..db import get_conn
-
-reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
 @reports_bp.get("/turnover")
 @login_required
@@ -369,4 +362,3 @@ def report_turnover():
         title="Umschlag 90 Tage",
         rows=rows
     )
-
