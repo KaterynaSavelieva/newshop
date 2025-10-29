@@ -326,39 +326,57 @@ def report_stock_low():
         rows=rows, threshold=threshold
     )
 
+# routes.py
+import json
+
 @reports_bp.get("/turnover")
 @login_required
 def report_turnover():
-    """
-    Umschlag 90 Tage – дашборд оборотності складу.
-    Бере дані з в’ю v_umschlag_90tage.
-    """
     rows = []
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    artikelID,
-                    produktname,
-                    lagerbestand,
-                    durchschnittskosten,
-                    lagerwert_now,
-                    min_einkaufspreis,
-                    max_einkaufspreis,
-                    verkaufsmenge_90,
-                    cogs_90,
-                    umschlag_90_approx,
-                    lagerdauer_tage
+                    artikelID,          -- 0
+                    produktname,        -- 1
+                    lagerbestand,       -- 2
+                    durchschnittskosten,-- 3
+                    lagerwert_now,      -- 4
+                    min_einkaufspreis,  -- 5
+                    max_einkaufspreis,  -- 6
+                    verkaufsmenge_90,   -- 7   <-- якщо у в’ю це поле інакше назване — виправ тут
+                    cogs_90,            -- 8
+                    umschlag_90_approx, -- 9
+                    lagerdauer_tage     -- 10
                 FROM v_umschlag_90tage
-                ORDER BY umschlag_90_approx DESC, lagerdauer_tage ASC;
+                ORDER BY umschlag_90_approx DESC, lagerdauer_tage ASC
             """)
             rows = cur.fetchall()
         conn.close()
 
-    # для шапки/титулу
+    # перетворимо у масив словників для фронтенду
+    rows_dict = [
+        {
+            "artikelID": r[0],
+            "artikel": r[1],
+            "bestand": int(r[2]),
+            "dkost": float(r[3] or 0),
+            "lagerwert": float(r[4] or 0),
+            "ek_min": float(r[5] or 0),
+            "ek_max": float(r[6] or 0),
+            "vk90": float(r[7] or 0),
+            "cogs90": float(r[8] or 0),
+            "umschlag": float(r[9] or 0),
+            "lagerdauer": float(r[10] or 0),
+        }
+        for r in rows
+    ]
+
     return render_template(
         "reports_turnover.html",
         title="Umschlag 90 Tage",
-        rows=rows
+        rows=rows,                          # щоб можна було й Jinja-таблицю зробити
+        rows_json=json.dumps(rows_dict)     # <-- головне для JS
     )
+
