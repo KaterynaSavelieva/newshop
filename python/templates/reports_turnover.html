@@ -73,10 +73,11 @@
 </div>
 
 <script>
-  // Дані з бекенду:
-  const rows = {{ rows_json|safe }};   // не забудь |safe
+  // Дані з бекенда
+  const rows = {{ rows_json|safe }};
+  const nf = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
 
-  // Фільтри з форми (ідентифікатори як у HTML!)
+  // ===== Фільтри =====
   function applyFilters(data) {
     const minU  = parseFloat(document.getElementById('fUmsMin').value || 0);
     const maxL  = parseFloat(document.getElementById('fLagMax').value || 9999);
@@ -88,60 +89,131 @@
     );
   }
 
-  function renderAll() {
-    const data = applyFilters(rows);
+  // ===== Сортування таблиці =====
+  let sortCol = null;    // 'artikel' | 'umschlag' | ...
+  let sortDir = 1;       // 1=ASC, -1=DESC
 
-    // таблиця (ID: turnTable)
+  function sortData(data) {
+    if (!sortCol) return data;
+    return [...data].sort((a,b) => {
+      const va = a[sortCol], vb = b[sortCol];
+      if (typeof va === 'string') return va.localeCompare(vb,'de') * sortDir;
+      return (va - vb) * sortDir;
+    });
+  }
+  function attachSorting() {
+    document.querySelectorAll('#turnTable thead th').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (!col) return;
+        if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+        renderAll();
+        // візуальна стрілка
+        document.querySelectorAll('#turnTable thead th').forEach(h => h.classList.remove('sorted-asc','sorted-desc'));
+        th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+      });
+    });
+  }
+
+  // ===== Рендер таблиці і графіків =====
+  let scChart, barChart;
+
+  function renderAll() {
+    // 1) фільтр + сортування
+    const filtered = applyFilters(rows);
+    const data = sortData(filtered);
+
+    // 2) таблиця
     const tbody = document.querySelector('#turnTable tbody');
     tbody.innerHTML = data.map(d => `
       <tr>
         <td>${d.artikel}</td>
-        <td class="text-end">${d.umschlag.toFixed(2)}</td>
-        <td class="text-end">${d.lagerdauer.toFixed(1)}</td>
-        <td class="text-end">${d.lagerwert.toFixed(2)}</td>
+        <td class="text-end">${nf.format(d.umschlag)}</td>
+        <td class="text-end">${nf.format(d.lagerdauer)}</td>
+        <td class="text-end">${nf.format(d.lagerwert)}</td>
         <td class="text-end">${d.bestand}</td>
-        <td class="text-end">${d.vk90.toFixed(2)}</td>
-        <td class="text-end">${d.cogs90.toFixed(2)}</td>
-        <td class="text-end">${d.ek_min.toFixed(2)}</td>
-        <td class="text-end">${d.ek_max.toFixed(2)}</td>
+        <td class="text-end">${nf.format(d.vk90)}</td>
+        <td class="text-end">${nf.format(d.cogs90)}</td>
+        <td class="text-end">${nf.format(d.ek_min)}</td>
+        <td class="text-end">${nf.format(d.ek_max)}</td>
       </tr>
     `).join('');
 
-    // bubble: Umschlag vs Lagerdauer (bubble = Lagerwert)
-    if (window.scChart) window.scChart.destroy();
-    window.scChart = new Chart(document.getElementById('scatterChart'), {
+    // 3) Bubble: Umschlag vs Lagerdauer (радіус ~ Lagerwert з нормалізацією)
+    const minLW = Math.min(...data.map(d => d.lagerwert), 0);
+    const maxLW = Math.max(...data.map(d => d.lagerwert), 1);
+    const rMin = 4, rMax = 18;
+    const rScale = v => {
+      const t = (v - minLW) / (maxLW - minLW || 1);
+      return rMin + t * (rMax - rMin);
+    };
+
+    const bubbleDS = data.map(d => ({
+      x: d.umschlag, y: d.lagerdauer, r: rScale(d.lagerwert), _label: d.artikel,
+      _lw: d.lagerwert
+    }));
+
+    if (scChart) scChart.destroy();
+    scChart = new Chart(document.getElementById('scatterChart'), {
       type: 'bubble',
-      data: {
-        datasets: [{
-          data: data.map(d => ({ x: d.umschlag, y: d.lagerdauer, r: Math.sqrt(Math.max(d.lagerwert,0)) / 2 }))
-        }]
-      },
+      data: { datasets: [{ data: bubbleDS }] },
       options: {
         responsive: true,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const p = ctx.raw;
+                return [
+                  p._label,
+                  `Umschlag: ${nf.format(p.x)}`,
+                  `Lagerdauer: ${nf.format(p.y)} T`,
+                  `Lagerwert: € ${nf.format(p._lw)}`
+                ];
+              }
+            }
+          }
+        },
         scales: {
-          x: { title: { display: true, text: 'Umschlag (90T)' } },
-          y: { title: { display: true, text: 'Lagerdauer (Tage)' } }
+          x: { title: { display: true, text: 'Umschlag (90T)' }, beginAtZero: true },
+          y: { title: { display: true, text: 'Lagerdauer (Tage)' }, beginAtZero: true }
         }
       }
     });
 
-    // top-15 за Lagerwert
-    const top = [...data].sort((a,b)=>b.lagerwert - a.lagerwert).slice(0,15);
-    if (window.barChart) window.barChart.destroy();
-    window.barChart = new Chart(document.getElementById('barChart'), {
+    // 4) Bar: Top-15 за Lagerwert
+    const top = [...data].sort((a,b)=> b.lagerwert - a.lagerwert).slice(0,15);
+    if (barChart) barChart.destroy();
+    barChart = new Chart(document.getElementById('barChart'), {
       type: 'bar',
-      data: { labels: top.map(d => d.artikel), datasets: [{ label: 'Lagerwert (€)', data: top.map(d => d.lagerwert) }] },
-      options: { responsive: true, plugins: { legend: { display:false } } }
+      data: {
+        labels: top.map(d => d.artikel),
+        datasets: [{ label: 'Lagerwert (€)', data: top.map(d => d.lagerwert) }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, tooltip: { callbacks: {
+          label: (ctx) => `€ ${nf.format(ctx.parsed.y)}`
+        }}},
+        scales: { y: { beginAtZero: true, title: { display: true, text: '€' } } }
+      }
     });
   }
 
+  // init
   document.addEventListener('DOMContentLoaded', () => {
-    console.log('rows:', rows.length, rows.slice(0,3)); // діагностика
+    attachSorting();
     renderAll();
   });
   document.getElementById('btnApply').addEventListener('click', e => { e.preventDefault(); renderAll(); });
 </script>
+<style>
+  /* маленький штрих для індикатора напрямку сортування */
+  #turnTable thead th.sorted-asc::after  { content:" ↑"; font-weight:600; }
+  #turnTable thead th.sorted-desc::after { content:" ↓"; font-weight:600; }
+</style>
+
 
 
 {% endblock %}
