@@ -1,10 +1,1411 @@
-<!DOCTYPE html>
-<html>
+
+
+
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard</title>
+
+    <!-- Bootstrap 5 -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        body { background: #f8f9fb; }
+        .navbar { background: #fff; border-bottom: 1px solid #e9ecef; }
+        .container { max-width: 1280px; }
+        .card { border-radius: 19px; }
+        .table thead th { white-space: nowrap; }
+    </style>
+</head>
 <body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-semibold" href="/">NewShop</a>
 
-<h1>My First Heading</h1>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="nav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active"
+                           href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                           href="/reports/daily">Umsatz pro Tag</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                           href="/reports/customers">Umsatz pro Kunde</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                           href="/reports/articles">Umsatz pro Artikel</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                           href="/reports/stock_low">Lagerwarnung</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                           href="/reports/turnover">Umschlag </a>
+                    </li>
 
-<p>My first paragraph.</p>
+                </ul>
 
+
+                <span class="text-muted small me-3">Admin</span>
+                <a class="btn btn-outline-secondary btn-sm" href="/logout">Abmelden</a>
+
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+
+
+
+
+
+<h2 class="mb-3">Verkaufsübersicht</h2>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-bordered mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Datum</th>
+                        <th>Kunde</th>
+                        <th>Kundentyp</th>
+                        <th>Artikel</th>
+                        <th class="text-end">Menge</th>
+                        <th class="text-end">VK (€)</th>
+                        <th class="text-end">EK (€)</th>
+                        <th class="text-end">Umsatz (€)</th>
+                        <th class="text-end">Kosten (€)</th>
+                        <th class="text-end">Marge (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Mehl</td>
+                        <td class="text-end">14</td>
+                        <td class="text-end">0.95</td>
+                        <td class="text-end">0.56</td>
+                        <td class="text-end">13.30</td>
+                        <td class="text-end">7.84</td>
+                        <td class="text-end">5.46</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Chips</td>
+                        <td class="text-end">17</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.22</td>
+                        <td class="text-end">35.70</td>
+                        <td class="text-end">20.73</td>
+                        <td class="text-end">14.97</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Essig</td>
+                        <td class="text-end">19</td>
+                        <td class="text-end">2.21</td>
+                        <td class="text-end">1.40</td>
+                        <td class="text-end">41.99</td>
+                        <td class="text-end">26.64</td>
+                        <td class="text-end">15.35</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Salz</td>
+                        <td class="text-end">15</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.58</td>
+                        <td class="text-end">15.75</td>
+                        <td class="text-end">8.70</td>
+                        <td class="text-end">7.05</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Reis</td>
+                        <td class="text-end">2</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.30</td>
+                        <td class="text-end">4.20</td>
+                        <td class="text-end">2.60</td>
+                        <td class="text-end">1.60</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Ketchup</td>
+                        <td class="text-end">1</td>
+                        <td class="text-end">2.63</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">2.63</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">1.05</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Öl</td>
+                        <td class="text-end">7</td>
+                        <td class="text-end">3.15</td>
+                        <td class="text-end">2.20</td>
+                        <td class="text-end">22.05</td>
+                        <td class="text-end">15.37</td>
+                        <td class="text-end">6.68</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Wasser</td>
+                        <td class="text-end">23</td>
+                        <td class="text-end">0.53</td>
+                        <td class="text-end">0.28</td>
+                        <td class="text-end">12.19</td>
+                        <td class="text-end">6.44</td>
+                        <td class="text-end">5.75</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Nudeln</td>
+                        <td class="text-end">24</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.12</td>
+                        <td class="text-end">45.36</td>
+                        <td class="text-end">26.88</td>
+                        <td class="text-end">18.48</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Kekse</td>
+                        <td class="text-end">13</td>
+                        <td class="text-end">2.73</td>
+                        <td class="text-end">1.67</td>
+                        <td class="text-end">35.49</td>
+                        <td class="text-end">21.71</td>
+                        <td class="text-end">13.78</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Käse</td>
+                        <td class="text-end">13</td>
+                        <td class="text-end">3.05</td>
+                        <td class="text-end">1.98</td>
+                        <td class="text-end">39.65</td>
+                        <td class="text-end">25.73</td>
+                        <td class="text-end">13.92</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Kaffee</td>
+                        <td class="text-end">21</td>
+                        <td class="text-end">4.73</td>
+                        <td class="text-end">3.29</td>
+                        <td class="text-end">99.33</td>
+                        <td class="text-end">69.02</td>
+                        <td class="text-end">30.31</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Schokolade</td>
+                        <td class="text-end">19</td>
+                        <td class="text-end">3.36</td>
+                        <td class="text-end">1.95</td>
+                        <td class="text-end">63.84</td>
+                        <td class="text-end">37.05</td>
+                        <td class="text-end">26.79</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Pfeffer</td>
+                        <td class="text-end">12</td>
+                        <td class="text-end">1.47</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">17.64</td>
+                        <td class="text-end">10.08</td>
+                        <td class="text-end">7.56</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Brot</td>
+                        <td class="text-end">25</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">0.98</td>
+                        <td class="text-end">39.50</td>
+                        <td class="text-end">24.63</td>
+                        <td class="text-end">14.88</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 15:00:01</td>
+                        <td>Anna Huber</td>
+                        <td>Standard</td>
+                        <td>Zwiebeln</td>
+                        <td class="text-end">3</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">3.15</td>
+                        <td class="text-end">1.95</td>
+                        <td class="text-end">1.20</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 14:00:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Gurken</td>
+                        <td class="text-end">19</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">0.94</td>
+                        <td class="text-end">30.02</td>
+                        <td class="text-end">17.85</td>
+                        <td class="text-end">12.17</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 14:00:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Kaffee</td>
+                        <td class="text-end">9</td>
+                        <td class="text-end">4.73</td>
+                        <td class="text-end">3.29</td>
+                        <td class="text-end">42.57</td>
+                        <td class="text-end">29.58</td>
+                        <td class="text-end">12.99</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 13:00:01</td>
+                        <td>Tobias Lang</td>
+                        <td>Gold</td>
+                        <td>Joghurt</td>
+                        <td class="text-end">22</td>
+                        <td class="text-end">1.26</td>
+                        <td class="text-end">0.89</td>
+                        <td class="text-end">24.95</td>
+                        <td class="text-end">19.56</td>
+                        <td class="text-end">5.39</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 12:00:01</td>
+                        <td>Johanna Boehm</td>
+                        <td>Gold</td>
+                        <td>Tee</td>
+                        <td class="text-end">20</td>
+                        <td class="text-end">3.68</td>
+                        <td class="text-end">2.61</td>
+                        <td class="text-end">66.24</td>
+                        <td class="text-end">52.26</td>
+                        <td class="text-end">13.98</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 12:00:01</td>
+                        <td>Johanna Boehm</td>
+                        <td>Gold</td>
+                        <td>Tomaten</td>
+                        <td class="text-end">9</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.27</td>
+                        <td class="text-end">17.01</td>
+                        <td class="text-end">11.42</td>
+                        <td class="text-end">5.59</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 12:00:01</td>
+                        <td>Johanna Boehm</td>
+                        <td>Gold</td>
+                        <td>Brot</td>
+                        <td class="text-end">5</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">0.98</td>
+                        <td class="text-end">7.11</td>
+                        <td class="text-end">4.93</td>
+                        <td class="text-end">2.19</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Öl</td>
+                        <td class="text-end">12</td>
+                        <td class="text-end">3.15</td>
+                        <td class="text-end">2.20</td>
+                        <td class="text-end">37.80</td>
+                        <td class="text-end">26.35</td>
+                        <td class="text-end">11.45</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Zucker</td>
+                        <td class="text-end">14</td>
+                        <td class="text-end">1.26</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">17.64</td>
+                        <td class="text-end">11.76</td>
+                        <td class="text-end">5.88</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Tee</td>
+                        <td class="text-end">24</td>
+                        <td class="text-end">3.68</td>
+                        <td class="text-end">2.61</td>
+                        <td class="text-end">88.32</td>
+                        <td class="text-end">62.72</td>
+                        <td class="text-end">25.60</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Butter</td>
+                        <td class="text-end">20</td>
+                        <td class="text-end">2.31</td>
+                        <td class="text-end">1.68</td>
+                        <td class="text-end">46.20</td>
+                        <td class="text-end">33.54</td>
+                        <td class="text-end">12.66</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Wasser</td>
+                        <td class="text-end">9</td>
+                        <td class="text-end">0.53</td>
+                        <td class="text-end">0.28</td>
+                        <td class="text-end">4.77</td>
+                        <td class="text-end">2.52</td>
+                        <td class="text-end">2.25</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Bier</td>
+                        <td class="text-end">20</td>
+                        <td class="text-end">2.52</td>
+                        <td class="text-end">1.53</td>
+                        <td class="text-end">50.40</td>
+                        <td class="text-end">30.68</td>
+                        <td class="text-end">19.72</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Tomaten</td>
+                        <td class="text-end">7</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.27</td>
+                        <td class="text-end">14.70</td>
+                        <td class="text-end">8.88</td>
+                        <td class="text-end">5.82</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Nudeln</td>
+                        <td class="text-end">10</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.12</td>
+                        <td class="text-end">18.90</td>
+                        <td class="text-end">11.20</td>
+                        <td class="text-end">7.70</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Kekse</td>
+                        <td class="text-end">8</td>
+                        <td class="text-end">2.73</td>
+                        <td class="text-end">1.67</td>
+                        <td class="text-end">21.84</td>
+                        <td class="text-end">13.36</td>
+                        <td class="text-end">8.48</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Kartoffeln</td>
+                        <td class="text-end">1</td>
+                        <td class="text-end">0.74</td>
+                        <td class="text-end">0.38</td>
+                        <td class="text-end">0.74</td>
+                        <td class="text-end">0.38</td>
+                        <td class="text-end">0.36</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Brot</td>
+                        <td class="text-end">20</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">0.98</td>
+                        <td class="text-end">31.60</td>
+                        <td class="text-end">19.70</td>
+                        <td class="text-end">11.90</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Eier</td>
+                        <td class="text-end">17</td>
+                        <td class="text-end">0.42</td>
+                        <td class="text-end">0.19</td>
+                        <td class="text-end">7.14</td>
+                        <td class="text-end">3.23</td>
+                        <td class="text-end">3.91</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Zwiebeln</td>
+                        <td class="text-end">10</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">10.50</td>
+                        <td class="text-end">6.50</td>
+                        <td class="text-end">4.00</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Milch</td>
+                        <td class="text-end">12</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">12.60</td>
+                        <td class="text-end">7.80</td>
+                        <td class="text-end">4.80</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Saft</td>
+                        <td class="text-end">17</td>
+                        <td class="text-end">2.94</td>
+                        <td class="text-end">1.93</td>
+                        <td class="text-end">49.98</td>
+                        <td class="text-end">32.86</td>
+                        <td class="text-end">17.12</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Mehl</td>
+                        <td class="text-end">3</td>
+                        <td class="text-end">0.95</td>
+                        <td class="text-end">0.56</td>
+                        <td class="text-end">2.85</td>
+                        <td class="text-end">1.68</td>
+                        <td class="text-end">1.17</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Wein</td>
+                        <td class="text-end">7</td>
+                        <td class="text-end">5.78</td>
+                        <td class="text-end">3.75</td>
+                        <td class="text-end">40.46</td>
+                        <td class="text-end">26.28</td>
+                        <td class="text-end">14.18</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Essig</td>
+                        <td class="text-end">18</td>
+                        <td class="text-end">2.21</td>
+                        <td class="text-end">1.40</td>
+                        <td class="text-end">39.78</td>
+                        <td class="text-end">25.24</td>
+                        <td class="text-end">14.54</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Senf</td>
+                        <td class="text-end">11</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.15</td>
+                        <td class="text-end">20.79</td>
+                        <td class="text-end">12.62</td>
+                        <td class="text-end">8.17</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 11:00:01</td>
+                        <td>David Hofer</td>
+                        <td>Standard</td>
+                        <td>Salz</td>
+                        <td class="text-end">14</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.58</td>
+                        <td class="text-end">14.70</td>
+                        <td class="text-end">8.12</td>
+                        <td class="text-end">6.58</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Ketchup</td>
+                        <td class="text-end">15</td>
+                        <td class="text-end">2.63</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">33.53</td>
+                        <td class="text-end">23.71</td>
+                        <td class="text-end">9.82</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Nudeln</td>
+                        <td class="text-end">12</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.12</td>
+                        <td class="text-end">19.28</td>
+                        <td class="text-end">13.44</td>
+                        <td class="text-end">5.84</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Schokolade</td>
+                        <td class="text-end">10</td>
+                        <td class="text-end">3.36</td>
+                        <td class="text-end">1.95</td>
+                        <td class="text-end">28.56</td>
+                        <td class="text-end">19.50</td>
+                        <td class="text-end">9.06</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Joghurt</td>
+                        <td class="text-end">11</td>
+                        <td class="text-end">1.26</td>
+                        <td class="text-end">0.89</td>
+                        <td class="text-end">11.78</td>
+                        <td class="text-end">9.78</td>
+                        <td class="text-end">2.00</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Milch</td>
+                        <td class="text-end">5</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">4.46</td>
+                        <td class="text-end">3.25</td>
+                        <td class="text-end">1.21</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Senf</td>
+                        <td class="text-end">7</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.15</td>
+                        <td class="text-end">11.25</td>
+                        <td class="text-end">8.03</td>
+                        <td class="text-end">3.22</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Tee</td>
+                        <td class="text-end">10</td>
+                        <td class="text-end">3.68</td>
+                        <td class="text-end">2.61</td>
+                        <td class="text-end">31.28</td>
+                        <td class="text-end">26.13</td>
+                        <td class="text-end">5.15</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 10:00:01</td>
+                        <td>Sebastian Graf</td>
+                        <td>Platin</td>
+                        <td>Chips</td>
+                        <td class="text-end">14</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.22</td>
+                        <td class="text-end">24.99</td>
+                        <td class="text-end">17.07</td>
+                        <td class="text-end">7.92</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Nudeln</td>
+                        <td class="text-end">23</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.12</td>
+                        <td class="text-end">43.47</td>
+                        <td class="text-end">25.76</td>
+                        <td class="text-end">17.71</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Apfel</td>
+                        <td class="text-end">12</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">0.47</td>
+                        <td class="text-end">10.08</td>
+                        <td class="text-end">5.65</td>
+                        <td class="text-end">4.43</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Kekse</td>
+                        <td class="text-end">6</td>
+                        <td class="text-end">2.73</td>
+                        <td class="text-end">1.67</td>
+                        <td class="text-end">16.38</td>
+                        <td class="text-end">10.02</td>
+                        <td class="text-end">6.36</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Kaffee</td>
+                        <td class="text-end">6</td>
+                        <td class="text-end">4.73</td>
+                        <td class="text-end">3.29</td>
+                        <td class="text-end">28.38</td>
+                        <td class="text-end">19.72</td>
+                        <td class="text-end">8.66</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Schokolade</td>
+                        <td class="text-end">8</td>
+                        <td class="text-end">3.36</td>
+                        <td class="text-end">1.95</td>
+                        <td class="text-end">26.88</td>
+                        <td class="text-end">15.60</td>
+                        <td class="text-end">11.28</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Joghurt</td>
+                        <td class="text-end">20</td>
+                        <td class="text-end">1.26</td>
+                        <td class="text-end">0.89</td>
+                        <td class="text-end">25.20</td>
+                        <td class="text-end">17.78</td>
+                        <td class="text-end">7.42</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Kartoffeln</td>
+                        <td class="text-end">8</td>
+                        <td class="text-end">0.74</td>
+                        <td class="text-end">0.38</td>
+                        <td class="text-end">5.92</td>
+                        <td class="text-end">3.03</td>
+                        <td class="text-end">2.89</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Brot</td>
+                        <td class="text-end">15</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">0.98</td>
+                        <td class="text-end">23.70</td>
+                        <td class="text-end">14.78</td>
+                        <td class="text-end">8.93</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Käse</td>
+                        <td class="text-end">13</td>
+                        <td class="text-end">3.05</td>
+                        <td class="text-end">1.98</td>
+                        <td class="text-end">39.65</td>
+                        <td class="text-end">25.73</td>
+                        <td class="text-end">13.92</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Eier</td>
+                        <td class="text-end">7</td>
+                        <td class="text-end">0.42</td>
+                        <td class="text-end">0.19</td>
+                        <td class="text-end">2.94</td>
+                        <td class="text-end">1.33</td>
+                        <td class="text-end">1.61</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Milch</td>
+                        <td class="text-end">20</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">21.00</td>
+                        <td class="text-end">13.00</td>
+                        <td class="text-end">8.00</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Pfeffer</td>
+                        <td class="text-end">9</td>
+                        <td class="text-end">1.47</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">13.23</td>
+                        <td class="text-end">7.56</td>
+                        <td class="text-end">5.67</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Zwiebeln</td>
+                        <td class="text-end">24</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">25.20</td>
+                        <td class="text-end">15.60</td>
+                        <td class="text-end">9.60</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Senf</td>
+                        <td class="text-end">13</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.15</td>
+                        <td class="text-end">24.57</td>
+                        <td class="text-end">14.91</td>
+                        <td class="text-end">9.66</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Mehl</td>
+                        <td class="text-end">24</td>
+                        <td class="text-end">0.95</td>
+                        <td class="text-end">0.56</td>
+                        <td class="text-end">22.80</td>
+                        <td class="text-end">13.44</td>
+                        <td class="text-end">9.36</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Wein</td>
+                        <td class="text-end">18</td>
+                        <td class="text-end">5.78</td>
+                        <td class="text-end">3.75</td>
+                        <td class="text-end">104.04</td>
+                        <td class="text-end">67.58</td>
+                        <td class="text-end">36.46</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Tee</td>
+                        <td class="text-end">24</td>
+                        <td class="text-end">3.68</td>
+                        <td class="text-end">2.61</td>
+                        <td class="text-end">88.32</td>
+                        <td class="text-end">62.72</td>
+                        <td class="text-end">25.60</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Essig</td>
+                        <td class="text-end">8</td>
+                        <td class="text-end">2.21</td>
+                        <td class="text-end">1.40</td>
+                        <td class="text-end">17.68</td>
+                        <td class="text-end">11.22</td>
+                        <td class="text-end">6.46</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Chips</td>
+                        <td class="text-end">18</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.22</td>
+                        <td class="text-end">37.80</td>
+                        <td class="text-end">21.95</td>
+                        <td class="text-end">15.85</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Ketchup</td>
+                        <td class="text-end">1</td>
+                        <td class="text-end">2.63</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">2.63</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">1.05</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Öl</td>
+                        <td class="text-end">11</td>
+                        <td class="text-end">3.15</td>
+                        <td class="text-end">2.20</td>
+                        <td class="text-end">34.65</td>
+                        <td class="text-end">24.15</td>
+                        <td class="text-end">10.50</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Zucker</td>
+                        <td class="text-end">12</td>
+                        <td class="text-end">1.26</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">15.12</td>
+                        <td class="text-end">10.08</td>
+                        <td class="text-end">5.04</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Butter</td>
+                        <td class="text-end">25</td>
+                        <td class="text-end">2.31</td>
+                        <td class="text-end">1.68</td>
+                        <td class="text-end">57.75</td>
+                        <td class="text-end">41.93</td>
+                        <td class="text-end">15.83</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Wasser</td>
+                        <td class="text-end">22</td>
+                        <td class="text-end">0.53</td>
+                        <td class="text-end">0.28</td>
+                        <td class="text-end">11.66</td>
+                        <td class="text-end">6.16</td>
+                        <td class="text-end">5.50</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:34:01</td>
+                        <td>Angelika Seidl</td>
+                        <td>Standard</td>
+                        <td>Tomaten</td>
+                        <td class="text-end">16</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.27</td>
+                        <td class="text-end">33.60</td>
+                        <td class="text-end">20.30</td>
+                        <td class="text-end">13.30</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:33:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Kartoffeln</td>
+                        <td class="text-end">24</td>
+                        <td class="text-end">0.74</td>
+                        <td class="text-end">0.38</td>
+                        <td class="text-end">17.76</td>
+                        <td class="text-end">9.10</td>
+                        <td class="text-end">8.66</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:33:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Pfeffer</td>
+                        <td class="text-end">1</td>
+                        <td class="text-end">1.47</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">1.47</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">0.63</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:33:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Zwiebeln</td>
+                        <td class="text-end">3</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">3.15</td>
+                        <td class="text-end">1.95</td>
+                        <td class="text-end">1.20</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:33:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Mehl</td>
+                        <td class="text-end">19</td>
+                        <td class="text-end">0.95</td>
+                        <td class="text-end">0.56</td>
+                        <td class="text-end">18.05</td>
+                        <td class="text-end">10.64</td>
+                        <td class="text-end">7.41</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:33:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Essig</td>
+                        <td class="text-end">23</td>
+                        <td class="text-end">2.21</td>
+                        <td class="text-end">1.40</td>
+                        <td class="text-end">50.83</td>
+                        <td class="text-end">32.25</td>
+                        <td class="text-end">18.58</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:33:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Butter</td>
+                        <td class="text-end">16</td>
+                        <td class="text-end">2.31</td>
+                        <td class="text-end">1.68</td>
+                        <td class="text-end">36.96</td>
+                        <td class="text-end">26.83</td>
+                        <td class="text-end">10.13</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:33:01</td>
+                        <td>Thomas Weber</td>
+                        <td>Standard</td>
+                        <td>Bier</td>
+                        <td class="text-end">5</td>
+                        <td class="text-end">2.52</td>
+                        <td class="text-end">1.53</td>
+                        <td class="text-end">12.60</td>
+                        <td class="text-end">7.67</td>
+                        <td class="text-end">4.93</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Reis</td>
+                        <td class="text-end">11</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.30</td>
+                        <td class="text-end">20.79</td>
+                        <td class="text-end">14.30</td>
+                        <td class="text-end">6.49</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Kekse</td>
+                        <td class="text-end">20</td>
+                        <td class="text-end">2.73</td>
+                        <td class="text-end">1.67</td>
+                        <td class="text-end">49.14</td>
+                        <td class="text-end">33.40</td>
+                        <td class="text-end">15.74</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Kartoffeln</td>
+                        <td class="text-end">9</td>
+                        <td class="text-end">0.74</td>
+                        <td class="text-end">0.38</td>
+                        <td class="text-end">5.99</td>
+                        <td class="text-end">3.41</td>
+                        <td class="text-end">2.58</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Pfeffer</td>
+                        <td class="text-end">18</td>
+                        <td class="text-end">1.47</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">23.81</td>
+                        <td class="text-end">15.12</td>
+                        <td class="text-end">8.69</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Brot</td>
+                        <td class="text-end">24</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">0.98</td>
+                        <td class="text-end">34.13</td>
+                        <td class="text-end">23.64</td>
+                        <td class="text-end">10.49</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Käse</td>
+                        <td class="text-end">6</td>
+                        <td class="text-end">3.05</td>
+                        <td class="text-end">1.98</td>
+                        <td class="text-end">16.47</td>
+                        <td class="text-end">11.88</td>
+                        <td class="text-end">4.59</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Mehl</td>
+                        <td class="text-end">23</td>
+                        <td class="text-end">0.95</td>
+                        <td class="text-end">0.56</td>
+                        <td class="text-end">19.67</td>
+                        <td class="text-end">12.88</td>
+                        <td class="text-end">6.79</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Senf</td>
+                        <td class="text-end">23</td>
+                        <td class="text-end">1.89</td>
+                        <td class="text-end">1.15</td>
+                        <td class="text-end">39.12</td>
+                        <td class="text-end">26.38</td>
+                        <td class="text-end">12.74</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Saft</td>
+                        <td class="text-end">4</td>
+                        <td class="text-end">2.94</td>
+                        <td class="text-end">1.93</td>
+                        <td class="text-end">10.58</td>
+                        <td class="text-end">7.73</td>
+                        <td class="text-end">2.85</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Öl</td>
+                        <td class="text-end">15</td>
+                        <td class="text-end">3.15</td>
+                        <td class="text-end">2.20</td>
+                        <td class="text-end">42.53</td>
+                        <td class="text-end">32.94</td>
+                        <td class="text-end">9.59</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Wasser</td>
+                        <td class="text-end">6</td>
+                        <td class="text-end">0.53</td>
+                        <td class="text-end">0.28</td>
+                        <td class="text-end">2.86</td>
+                        <td class="text-end">1.68</td>
+                        <td class="text-end">1.18</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:32:01</td>
+                        <td>Petra Leitner</td>
+                        <td>Gold</td>
+                        <td>Tomaten</td>
+                        <td class="text-end">25</td>
+                        <td class="text-end">2.10</td>
+                        <td class="text-end">1.27</td>
+                        <td class="text-end">47.25</td>
+                        <td class="text-end">31.71</td>
+                        <td class="text-end">15.54</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:31:01</td>
+                        <td>Michael Berger</td>
+                        <td>Standard</td>
+                        <td>Pfeffer</td>
+                        <td class="text-end">19</td>
+                        <td class="text-end">1.47</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">27.93</td>
+                        <td class="text-end">15.96</td>
+                        <td class="text-end">11.97</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:31:01</td>
+                        <td>Michael Berger</td>
+                        <td>Standard</td>
+                        <td>Käse</td>
+                        <td class="text-end">15</td>
+                        <td class="text-end">3.05</td>
+                        <td class="text-end">1.98</td>
+                        <td class="text-end">45.75</td>
+                        <td class="text-end">29.69</td>
+                        <td class="text-end">16.06</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:31:01</td>
+                        <td>Michael Berger</td>
+                        <td>Standard</td>
+                        <td>Zwiebeln</td>
+                        <td class="text-end">1</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">1.05</td>
+                        <td class="text-end">0.65</td>
+                        <td class="text-end">0.40</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-29 09:31:01</td>
+                        <td>Michael Berger</td>
+                        <td>Standard</td>
+                        <td>Apfel</td>
+                        <td class="text-end">18</td>
+                        <td class="text-end">0.84</td>
+                        <td class="text-end">0.47</td>
+                        <td class="text-end">15.12</td>
+                        <td class="text-end">8.48</td>
+                        <td class="text-end">6.64</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-28 23:20:01</td>
+                        <td>Eva Pichler</td>
+                        <td>Gold</td>
+                        <td>Brot</td>
+                        <td class="text-end">7</td>
+                        <td class="text-end">1.58</td>
+                        <td class="text-end">0.98</td>
+                        <td class="text-end">9.95</td>
+                        <td class="text-end">6.90</td>
+                        <td class="text-end">3.06</td>
+                    </tr>
+
+                    <tr>
+                        <td>2025-10-28 23:20:01</td>
+                        <td>Eva Pichler</td>
+                        <td>Gold</td>
+                        <td>Kaffee</td>
+                        <td class="text-end">2</td>
+                        <td class="text-end">4.73</td>
+                        <td class="text-end">3.29</td>
+                        <td class="text-end">8.51</td>
+                        <td class="text-end">6.57</td>
+                        <td class="text-end">1.94</td>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+    </main>
+
+    <footer class="text-center text-muted py-3 small">© NewShop – Demo Dashboard</footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
