@@ -33,8 +33,8 @@
 <div class="card mb-3">
   <div class="card-header py-2">Pareto-Diagramm (Balken = Umsatz, Linie = kum. %)</div>
   <div class="card-body">
-    <div style="position:relative;height:420px">
-      <canvas id="paretoChart"></canvas>
+    <div style="position:relative">
+      <canvas id="paretoChart" height="420"></canvas>
     </div>
   </div>
 </div>
@@ -76,13 +76,11 @@
 </div>
 
 <script>
-  // Масиви з Jinja -> JS:
-  const labels  = {{ chart_labels   | tojson }};
-  const bars    = {{ chart_bars     | tojson }};
-  const cumLine = {{ chart_cum_line | tojson }};
+  const labels  = {{ chart_labels   | tojson | safe }};
+  const bars    = {{ chart_bars     | tojson | safe }};
+  const cumLine = {{ chart_cum_line | tojson | safe }};
 
-  // Захист від порожніх/некоректних даних
-  if (Array.isArray(labels) && labels.length && Array.isArray(bars) && Array.isArray(cumLine)) {
+  if (Array.isArray(labels) && labels.length > 0 && Array.isArray(bars) && bars.length === labels.length) {
     const ctx = document.getElementById('paretoChart').getContext('2d');
     if (window.paretoChart) window.paretoChart.destroy();
 
@@ -91,22 +89,25 @@
       data: {
         labels,
         datasets: [
-          { type: 'bar',  label: 'Umsatz (€)',     data: bars,    yAxisID: 'y'  },
-          { type: 'line', label: 'Kumulativ (%)',  data: cumLine, yAxisID: 'y1' }
+          { type: 'bar',  label: 'Umsatz (€)',    data: bars,    yAxisID: 'y'  },
+          { type: 'line', label: 'Kumulativ (%)', data: cumLine, yAxisID: 'y1', tension: 0.3, pointRadius: 2 }
         ]
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,      // <-- висота 420px працює
+        maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         scales: {
           y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
           y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
-                grid: { drawOnChartArea: false } }
+                grid: { drawOnChartArea: false } },
+          x:  { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 15 } }
         },
         plugins: { legend: { display: true } }
       }
     });
+  } else {
+    console.warn('Pareto: порожні дані для графіка', {labels, bars, cumLine});
   }
 </script>
 

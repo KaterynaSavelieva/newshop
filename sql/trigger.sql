@@ -171,5 +171,24 @@ BEGIN
      SET lagerbestand = lagerbestand + OLD.verkaufsmenge
    WHERE artikelID = OLD.artikelID;
 END $$
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_update_avgcost
+AFTER INSERT ON einkaufartikel
+FOR EACH ROW
+BEGIN
+  DECLARE avgcost DECIMAL(10,4);
+
+  SELECT ROUND(SUM(ea.einkaufsmenge * ea.einkaufspreis) / NULLIF(SUM(ea.einkaufsmenge),0),4)
+    INTO avgcost
+  FROM einkaufartikel ea
+  WHERE ea.artikelID = NEW.artikelID;
+
+  UPDATE artikel
+     SET durchschnittskosten = avgcost
+   WHERE artikelID = NEW.artikelID;
+END$$
 
 DELIMITER ;
