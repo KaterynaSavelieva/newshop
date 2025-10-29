@@ -7,7 +7,7 @@
         <div class="card-body">
             <h4 class="card-title text-center mb-3">Anmeldung</h4>
             <p class="text-muted text-center mb-4">Bitte geben Sie Ihre Zugangsdaten ein.</p>
-            <form method="post" action="{{ url_for('login') }}">
+            <form method="post" action="{{ url_for('auth.login') }}">
                 <div class="mb-3">
                     <label class="form-label">E-Mail-Adresse</label>
                     <input class="form-control" type="email" name="email" placeholder="name@example.com" required autofocus>
