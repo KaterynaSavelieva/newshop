@@ -58,6 +58,11 @@
               <a class="nav-link {% if request.endpoint == 'reports.report_turnover' %}active{% endif %}"
                  href="{{ url_for('reports.report_turnover') }}">Umschlag 90 Tag</a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.report_pareto' %}active{% endif %}"
+                href="{{ url_for('reports.report_pareto') }}">Pareto 80/20</a>
+            </li>
+
           </ul>
 
           {% if current_user.is_authenticated %}

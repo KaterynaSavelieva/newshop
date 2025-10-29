@@ -20,15 +20,15 @@ def ranges_for_type(kundentyp: str):
     """Повертає ((min_menge, max_menge), (min_items, max_items)) для заданого типу."""
     t = (kundentyp or "Standard").strip().lower()
     if t == "standard":
-        return (1, 25), (1, 50)
+        return (1, 25), (1, 25)
     if t == "silber":
-        return (1, 50), (1, 25)
+        return (1, 50), (1, 50)
     if t == "gold":
         return (1, 100), (1, 100)
     if t == "platin":
         return (1, 150), (1, 150)
     # дефолт — як Standard
-    return (1, 25), (1, 50)
+    return (1, 25), (1, 25)
 
 
 def pick_customer(cur):

@@ -21,7 +21,7 @@ def fetch_low_stock(cur):
     cur.execute("""
         SELECT artikelID, produktname, lagerbestand
         FROM artikel
-        WHERE lagerbestand < 100;
+        WHERE lagerbestand < 1000;
     """)
     return cur.fetchall()
 
@@ -56,8 +56,8 @@ def add_item(cur, einkauf_id, artikel_id, menge, preis):
 
 
 def main():
-    start_date = datetime(2025, 2, 15)
-    end_date = datetime(2025, 3, 3)
+    start_date = datetime(2025, 1, 1)
+    end_date = datetime(2025, 10, 26)
 
     conn = get_conn()
     if not conn:
@@ -81,7 +81,7 @@ def main():
                     skipped.append((artikel_id, name))
                     continue
                 lieferant_id, preis = sup
-                menge = random.randint(25, 120)
+                menge = random.randint(25, 400)
                 plan.setdefault(lieferant_id, []).append((artikel_id, menge, preis))
 
             if not plan:

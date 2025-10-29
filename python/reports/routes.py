@@ -297,7 +297,7 @@ def report_stock_low():
     try:
         threshold = int(threshold)
     except ValueError:
-        threshold = 150
+        threshold = 450
 
     rows = []
     conn = get_conn()
@@ -379,3 +379,84 @@ def report_turnover():
         rows_json=json.dumps(rows_dict)     # <-- головне для JS
     )
 
+
+# --- Pareto 80/20 ---
+@reports_bp.get("/pareto")
+@login_required
+def report_pareto():
+    from datetime import date, timedelta
+    import json
+
+    # фільтри
+    bis = request.args.get("bis") or date.today().isoformat()
+    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=90)).isoformat()
+    by  = request.args.get("by", "artikel")  # 'artikel' або 'kunde'
+
+    # SQL за режимом
+    if by == "kunde":
+        sql = """
+            SELECT kundenID    AS id,
+                   kunde       AS name,
+                   ROUND(SUM(umsatz), 2) AS umsatz
+            FROM v_sales
+            WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
+            GROUP BY kundenID, kunde
+            ORDER BY umsatz DESC
+        """
+        title = "Pareto 80/20 – Umsatz pro Kunde"
+    else:
+        sql = """
+            SELECT artikelID   AS id,
+                   artikel     AS name,
+                   ROUND(SUM(umsatz), 2) AS umsatz
+            FROM v_sales
+            WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
+            GROUP BY artikelID, artikel
+            ORDER BY umsatz DESC
+        """
+        title = "Pareto 80/20 – Umsatz pro Artikel"
+
+    rows = []
+    conn = get_conn()
+    if conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (von, bis))
+            rows = cur.fetchall()   # [(id, name, umsatz), ...]
+        conn.close()
+
+    # підрахунок часток і кумулятиву в Python (надійно і швидко)
+    total = float(sum(r[2] for r in rows)) or 1.0
+    data = []
+    cum = 0.0
+    top80_count = 0
+    for idx, (rid, name, umsatz) in enumerate(rows, start=1):
+        share = float(umsatz) / total * 100.0
+        cum += share
+        data.append({
+            "rank": idx,
+            "id": rid,
+            "name": name,
+            "umsatz": float(umsatz),
+            "share": round(share, 2),
+            "cum_share": round(cum, 2),
+            "in80": cum <= 80.0
+        })
+        if cum <= 80.0:
+            top80_count = idx
+
+    # дані для графіка (візьмемо перші 25 позицій, щоб не перевантажувати графік)
+    chart_labels   = [d["name"] for d in data[:25]]
+    chart_bars     = [d["umsatz"] for d in data[:25]]
+    chart_cum_line = [d["cum_share"] for d in data[:25]]
+
+    return render_template(
+        "reports_pareto.html",
+        title=title,
+        by=by, von=von, bis=bis,
+        total=round(total, 2),
+        top80_count=top80_count,
+        rows=data,
+        chart_labels=json.dumps(chart_labels),
+        chart_bars=json.dumps(chart_bars),
+        chart_cum_line=json.dumps(chart_cum_line),
+    )

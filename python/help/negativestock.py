@@ -3,7 +3,7 @@ import math
 from datetime import datetime, timedelta
 from db import get_conn
 
-TAG_NOTE = "Auto-fix negative stock"
+TAG_NOTE = "Auto-fix stock "
 
 def fetch_negatives(cur):
     cur.execute("""

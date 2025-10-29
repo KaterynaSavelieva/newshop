@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Pareto 80/20{% endblock %}
+{% block content %}
+
+<h3 class="mb-3">Pareto 80/20</h3>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto">
+    <label class="form-label">Von</label>
+    <input type="date" name="von" class="form-control" value="{{ von }}">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">Bis</label>
+    <input type="date" name="bis" class="form-control" value="{{ bis }}">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">Modus</label>
+    <select name="by" class="form-select">
+      <option value="artikel" {{ 'selected' if by=='artikel' else '' }}>Artikel</option>
+      <option value="kunde"   {{ 'selected' if by=='kunde'   else '' }}>Kunde</option>
+    </select>
+  </div>
+  <div class="col-auto align-self-end">
+    <button class="btn btn-primary">Anzeigen</button>
+  </div>
+</form>
+
+<div class="alert alert-info py-2">
+  Gesamtumsatz: <b>{{ '%.2f'|format(total) }} €</b>.
+  Top-80% erreichen <b>{{ top80_count }}</b> {{ 'Kunden' if by=='kunde' else 'Artikel' }}.
+</div>
+
+<div class="card mb-3">
+  <div class="card-header py-2">Pareto-Diagramm (Balken = Umsatz, Linie = kum. %)</div>
+  <div class="card-body">
+    <div style="position:relative;height:420px">
+      <canvas id="paretoChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header py-2">Tabelle (nach Umsatz absteigend)</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped table-bordered mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>{{ 'Kunde' if by=='kunde' else 'Artikel' }}</th>
+          <th class="text-end">Umsatz (€)</th>
+          <th class="text-end">Anteil (%)</th>
+          <th class="text-end">Kumulativ (%)</th>
+          <th>Top 80%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.rank }}</td>
+          <td>{{ r.name }}</td>
+          <td class="text-end">{{ '%.2f'|format(r.umsatz) }}</td>
+          <td class="text-end">{{ '%.2f'|format(r.share) }}</td>
+          <td class="text-end">{{ '%.2f'|format(r.cum_share) }}</td>
+          <td>
+            {% if r.in80 %}
+              <span class="badge bg-success">✓</span>
+            {% else %}
+              <span class="badge bg-secondary">–</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const labels   = {{ chart_labels|safe }};
+  const bars     = {{ chart_bars|safe }};
+  const cumLine  = {{ chart_cum_line|safe }};
+
+  const ctx = document.getElementById('paretoChart');
+  if (window.paretoChart) window.paretoChart.destroy();
+
+  window.paretoChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Umsatz (€)', data: bars, yAxisID: 'y' },
+        { label: 'Kumulativ (%)', data: cumLine, yAxisID: 'y1', type: 'line' }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
+        y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right', grid: { drawOnChartArea: false } }
+      },
+      plugins: { legend: { display: true } }
+    }
+  });
+</script>
+
+{% endblock %}
