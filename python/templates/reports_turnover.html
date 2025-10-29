@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}Umschlag 90 Tage{% endblock %}
+{% block content %}
+
+<style>
+  .chart-wrap { position: relative; width: 100%; max-width: 1100px; height: 420px; margin: 0 auto; }
+  .table thead th { cursor: pointer; }
+  .sticky-controls { position: sticky; top: 8px; z-index: 2; }
+</style>
+
+<h3 class="mb-3">Umschlag 90 Tage</h3>
+
+<div class="row g-3">
+  <div class="col-lg-3">
+    <div class="card">
+      <div class="card-header py-2">Filter</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label">Min. Umschlag</label>
+          <input id="fUmsMin" type="number" step="0.1" class="form-control" value="0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Max. Lagerdauer (Tage)</label>
+          <input id="fLagMax" type="number" step="1" class="form-control" value="9999">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Min. Lagerwert (€)</label>
+          <input id="fLagWMin" type="number" step="0.01" class="form-control" value="0">
+        </div>
+        <button id="btnApply" class="btn btn-primary w-100 sticky-controls">Filtern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-9">
+    <div class="card mb-3">
+      <div class="card-header py-2">Umschlag vs. Lagerdauer (Bubble = Lagerwert)</div>
+      <div class="card-body">
+        <div class="chart-wrap"><canvas id="scatterChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header py-2">Top 15 nach Lagerwert</div>
+      <div class="card-body">
+        <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header py-2">Tabelle (klickbare Sortierung)</div>
+  <div class="card-body table-responsive">
+    <table id="turnTable" class="table table-sm table-striped table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th data-col="produktname">Artikel</th>
+          <th data-col="umschlag">Umschlag</th>
+          <th data-col="lagerdauer">Lagerdauer (T)</th>
+          <th data-col="lagerwert">Lagerwert (€)</th>
+          <th data-col="lagerbestand">Bestand</th>
+          <th data-col="vk90">Verkauf 90d (Menge)</th>
+          <th data-col="cogs90">COGS 90d (€)</th>
+          <th data-col="ek_min">EK min</th>
+          <th data-col="ek_max">EK max</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="text-muted small">Klick auf Spaltenkopf = sortieren (↑/↓).</div>
+  </div>
+</div>
+
+<script>
+  // ДАНІ з Python
+  const raw = [
+    // порядок колонок має відповідати SELECT у роуті
+    // artikelID, produktname, lagerbestand, durchschnittskosten, lagerwert_now,
+    // min_einkaufspreis, max_einkaufspreis, verkaufsmenge_90, cogs_90,
+    // umschlag_90_approx, lagerdauer_tage
+    {% for r in rows %}
+      {
+        id: {{ r[0]|tojson }},
+        name: {{ r[1]|tojson }},
+        bestand: {{ r[2]|default(0)|tojson }},
+        dcost: {{ r[3]|default(0)|tojson }},
+        lagerwert: {{ r[4]|default(0)|tojson }},
+        ek_min: {{ r[5]|default(0)|tojson }},
+        ek_max: {{ r[6]|default(0)|tojson }},
+        vk90: {{ r[7]|default(0)|tojson }},
+        cogs90: {{ r[8]|default(0)|tojson }},
+        umschlag: {{ r[9]|default(0)|tojson }},
+        lagerdauer: {{ r[10]|default(0)|tojson }}
+      }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  // СТАН + УТИЛІТИ
+  let state = {
+    data: raw.slice(),
+    sort: { key: 'umschlag', dir: 'desc' }, // початкове сортування
+    filter: { umschlagMin: 0, lagerdauerMax: 9999, lagerwertMin: 0 }
+  };
+
+  function applyFilter(data){
+    const f = state.filter;
+    return data.filter(d =>
+      d.umschlag >= (+f.umschlagMin || 0) &&
+      d.lagerdauer <= (+f.lagerdauerMax || 999999) &&
+      d.lagerwert >= (+f.lagerwertMin || 0)
+    );
+  }
+
+  function applySort(data){
+    const { key, dir } = state.sort;
+    const mul = dir === 'asc' ? 1 : -1;
+    return data.slice().sort((a,b)=>{
+      const va = (key==='name') ? (a.name||"") : (+a[key]||0);
+      const vb = (key==='name') ? (b.name||"") : (+b[key]||0);
+      if (va < vb) return -1*mul;
+      if (va > vb) return  1*mul;
+      return 0;
+    });
+  }
+
+  // ТАБЛИЦЯ
+  const tbody = document.querySelector('#turnTable tbody');
+  function renderTable(){
+    const filtered = applyFilter(state.data);
+    const sorted = applySort(filtered);
+    tbody.innerHTML = sorted.map(d => `
+      <tr>
+        <td>${d.name}</td>
+        <td class="text-end">${d.umschlag.toFixed(2)}</td>
+        <td class="text-end">${Math.round(d.lagerdauer)}</td>
+        <td class="text-end">${d.lagerwert.toFixed(2)}</td>
+        <td class="text-end">${d.bestand}</td>
+        <td class="text-end">${d.vk90}</td>
+        <td class="text-end">${d.cogs90.toFixed(2)}</td>
+        <td class="text-end">${d.ek_min.toFixed(2)}</td>
+        <td class="text-end">${d.ek_max.toFixed(2)}</td>
+      </tr>
+    `).join('');
+    renderCharts(sorted);
+  }
+
+  // СОРТУВАННЯ ПО КЛІКУ
+  document.querySelectorAll('#turnTable thead th').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const col = th.dataset.col;
+      const map = {
+        produktname: 'name',
+        umschlag: 'umschlag',
+        lagerdauer: 'lagerdauer',
+        lagerwert: 'lagerwert',
+        lagerbestand: 'bestand',
+        vk90: 'vk90',
+        cogs90: 'cogs90',
+        ek_min: 'ek_min',
+        ek_max: 'ek_max'
+      };
+      const key = map[col] || 'umschlag';
+      if (state.sort.key === key){
+        state.sort.dir = (state.sort.dir === 'asc' ? 'desc' : 'asc');
+      } else {
+        state.sort.key = key;
+        state.sort.dir = (key==='name') ? 'asc' : 'desc';
+      }
+      renderTable();
+    });
+  });
+
+  // ФІЛЬТРИ
+  document.getElementById('btnApply').addEventListener('click', ()=>{
+    state.filter.umschlagMin = document.getElementById('fUmsMin').value;
+    state.filter.lagerdauerMax = document.getElementById('fLagMax').value;
+    state.filter.lagerwertMin  = document.getElementById('fLagWMin').value;
+    renderTable();
+  });
+
+  // ГРАФІКИ (Chart.js)
+  let scatter, bar;
+
+  function renderCharts(sorted){
+    const labels = sorted.map(d=>d.name);
+    const points = sorted.map(d=>({
+      x: d.umschlag,
+      y: d.lagerdauer,
+      r: Math.max(3, Math.sqrt(d.lagerwert) / 10) // легке масштабування бульбашки
+    }));
+
+    const top = sorted.slice().sort((a,b)=>b.lagerwert-a.lagerwert).slice(0,15);
+    const barLabels = top.map(d=>d.name);
+    const barVals   = top.map(d=>d.lagerwert);
+
+    if (scatter) scatter.destroy();
+    if (bar)     bar.destroy();
+
+    scatter = new Chart(document.getElementById('scatterChart'), {
+      type: 'bubble',
+      data: { datasets: [{
+        label: 'Artikel',
+        data: points,
+        parsing: false
+      }]},
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        scales: {
+          x: { title:{display:true, text:'Umschlag (90 Tage)'}, beginAtZero:true },
+          y: { title:{display:true, text:'Lagerdauer (Tage)'}, beginAtZero:true }
+        },
+        plugins:{ legend:{ display:false }, tooltip:{ callbacks:{
+          label:(ctx)=>{
+            const d = sorted[ctx.dataIndex];
+            return `${d.name}: Umschlag ${d.umschlag.toFixed(2)}, Dauer ${Math.round(d.lagerdauer)}T, Lagerwert €${d.lagerwert.toFixed(2)}`;
+          }
+        }}}
+      }
+    });
+
+    bar = new Chart(document.getElementById('barChart'), {
+      type: 'bar',
+      data: { labels: barLabels, datasets: [{ label:'Lagerwert (€)', data: barVals }] },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ beginAtZero:true, title:{display:true,text:'€'} } }
+      }
+    });
+  }
+
+  // перший рендер
+  renderTable();
+</script>
+{% endblock %}

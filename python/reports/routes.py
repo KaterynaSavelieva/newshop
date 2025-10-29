@@ -325,3 +325,48 @@ def report_stock_low():
         title="Lagerwarnung / Artikel mit niedrigem Bestand",
         rows=rows, threshold=threshold
     )
+
+# python/reports/routes.py
+from flask import Blueprint, render_template, request
+from flask_login import login_required
+from ..db import get_conn
+
+reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
+
+@reports_bp.get("/turnover")
+@login_required
+def report_turnover():
+    """
+    Umschlag 90 Tage – дашборд оборотності складу.
+    Бере дані з в’ю v_umschlag_90tage.
+    """
+    rows = []
+    conn = get_conn()
+    if conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    artikelID,
+                    produktname,
+                    lagerbestand,
+                    durchschnittskosten,
+                    lagerwert_now,
+                    min_einkaufspreis,
+                    max_einkaufspreis,
+                    verkaufsmenge_90,
+                    cogs_90,
+                    umschlag_90_approx,
+                    lagerdauer_tage
+                FROM v_umschlag_90tage
+                ORDER BY umschlag_90_approx DESC, lagerdauer_tage ASC;
+            """)
+            rows = cur.fetchall()
+        conn.close()
+
+    # для шапки/титулу
+    return render_template(
+        "reports_turnover.html",
+        title="Umschlag 90 Tage",
+        rows=rows
+    )
+
