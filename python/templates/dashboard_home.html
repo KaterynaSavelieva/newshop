@@ -1,25 +1,37 @@
 {% extends "base.html" %}
-{% block title %}NewShop Dashboard{% endblock %}
+{% block title %}NewShop{% endblock %}
 {% block content %}
 
-<div class="row justify-content-center">
-  <div class="col-lg-8">
-    <div class="card border-0 shadow-sm">
-      <div class="card-body p-4 text-center">
-        <img src="{{ url_for('static', filename='img/shop_logo.png') }}"
-             alt="Logo" class="img-fluid mb-3" style="max-height:160px">
-        <h2 class="mb-2">NewShop</h2>
-        <p class="text-muted mb-4">Demo Dashboard – Verkaufs- und Lager-Insights</p>
+<style>
+  .hero {
+    min-height: calc(100vh - 120px); /* висота екрану мінус navbar+footer */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+  }
+  .hero img {
+    width: 100%;
+    max-width: 1400px;                           /* щоб не “розривало” */
+    max-height: calc(100vh - 220px);             /* не виходити за екран */
+    object-fit: contain;                         /* вся картинка вміщується */
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+  }
+</style>
 
-        <div class="d-flex flex-wrap gap-2 justify-content-center">
-          <a class="btn btn-primary" href="{{ url_for('reports.report_daily') }}">Umsatz pro Tag</a>
-          <a class="btn btn-outline-primary" href="{{ url_for('reports.report_customers') }}">Umsatz pro Kunde</a>
-          <a class="btn btn-outline-primary" href="{{ url_for('reports.report_articles') }}">Umsatz pro Artikel</a>
-          <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_stock_low') }}">Lagerwarnung</a>
-          <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_turnover') }}">Umschlag 90 Tag</a>
-        </div>
-      </div>
-    </div>
+<div class="hero container">
+  <img src="{{ url_for('static', filename='img/shop_logo.png') }}" alt="NewShop">
+  <h2 class="mt-3 fw-semibold">NewShop</h2>
+  <p class="text-muted">Demo Dashboard – Verkaufs- und Lager-Insights</p>
+
+  <div class="d-flex gap-2 flex-wrap justify-content-center mt-2">
+    <a class="btn btn-primary"        href="{{ url_for('reports.report_daily') }}">Umsatz pro Tag</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('reports.report_customers') }}">Umsatz pro Kunde</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('reports.report_articles') }}">Umsatz pro Artikel</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_stock_low') }}">Lagerwarnung</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_turnover') }}">Umschlag 90 Tag</a>
   </div>
 </div>
 
