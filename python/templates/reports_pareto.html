@@ -97,6 +97,9 @@
 
     const ctx = cvs.getContext('2d');
     if (window.paretoChart) window.paretoChart.destroy();
+    if (window.paretoChart instanceof Chart) {
+     window.paretoChart.destroy();
+    }
 
     window.paretoChart = new Chart(ctx, {
       type: 'bar',
