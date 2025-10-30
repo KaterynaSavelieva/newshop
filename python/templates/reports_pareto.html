@@ -81,59 +81,86 @@
 
 <script>
   const labels  = {{ chart_labels   | tojson | safe }};
-  const bars    = {{ chart_bars     | tojson | safe }}.map(v => Number(v) || 0);
-  const cumLine = {{ chart_cum_line | tojson | safe }}.map(v => Number(v) || 0);
+  const barsRaw = {{ chart_bars     | tojson | safe }};
+  const cumRaw  = {{ chart_cum_line | tojson | safe }};
+
+  const bars    = Array.isArray(barsRaw) ? barsRaw.map(v => Number(v) || 0) : [];
+  const cumLine = Array.isArray(cumRaw)  ? cumRaw.map(v => Number(v) || 0)  : [];
 
   function buildPareto() {
-    if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
-    const cvs = document.getElementById('paretoChart');
-    const holder = document.getElementById('paretoContainer');
-    if (!cvs || !holder) { console.error('canvas/container not found'); return; }
-    if (!labels.length) { console.warn('no data for chart'); return; }
-
-    // ВАЖЛИВО: Canvas повинен зайняти контейнер
-    cvs.width  = holder.clientWidth;
-    cvs.height = holder.clientHeight;
-
-    const ctx = cvs.getContext('2d');
-    if (window.paretoChart) window.paretoChart.destroy();
-    if (window.paretoChart instanceof Chart) {
-     window.paretoChart.destroy();
-    }
-
-    window.paretoChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { type: 'bar',  label: 'Umsatz (€)',    data: bars,    yAxisID: 'y'  },
-          { type: 'line', label: 'Kumulativ (%)', data: cumLine, yAxisID: 'y1', tension: 0.3, pointRadius: 2 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,   // працюємо по висоті контейнера
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
-          y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
-                grid: { drawOnChartArea: false } },
-          x:  { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 15 } }
-        },
-        plugins: { legend: { display: true } }
+    try {
+      if (typeof Chart === 'undefined') {
+        console.error('❌ Chart.js not loaded');
+        return;
       }
-    });
-    console.log('Pareto намальовано ✅', {w: cvs.width, h: cvs.height});
+
+      const cvs = document.getElementById('paretoChart');
+      if (!cvs) {
+        console.error('❌ Canvas #paretoChart not found');
+        return;
+      }
+
+      // 🧩 Безпечне знищення попереднього графіка
+      if (window.paretoChart && typeof window.paretoChart.destroy === 'function') {
+        window.paretoChart.destroy();
+      }
+
+      // 🧠 Побудова нового графіка
+      const ctx = cvs.getContext('2d');
+      window.paretoChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Umsatz (€)',
+              data: bars,
+              yAxisID: 'y',
+              backgroundColor: 'rgba(54, 162, 235, 0.5)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 1
+            },
+            {
+              type: 'line',
+              label: 'Kumulativ (%)',
+              data: cumLine,
+              yAxisID: 'y1',
+              tension: 0.3,
+              pointRadius: 2,
+              borderColor: 'rgba(255, 99, 132, 1)',
+              backgroundColor: 'rgba(255, 99, 132, 0.3)',
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
+            y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
+                  grid: { drawOnChartArea: false } },
+            x:  { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 15 } }
+          },
+          plugins: { legend: { display: true } }
+        }
+      });
+
+      console.log('✅ Pareto chart built successfully');
+    } catch (e) {
+      console.error('❌ Error while building Pareto chart:', e);
+    }
   }
 
-  // Після DOM і після повного завантаження (на випадок, якщо ширина ще 0)
+  // ⏳ Запуск після завантаження сторінки
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', buildPareto);
   } else {
     buildPareto();
   }
-  window.addEventListener('load', () => setTimeout(buildPareto, 0));
-  window.addEventListener('resize', () => setTimeout(buildPareto, 100)); // підлаштування при ресайзі
+  window.addEventListener('load', () => setTimeout(buildPareto, 100));
 </script>
 
 {% endblock %}
