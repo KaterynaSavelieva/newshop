@@ -123,11 +123,13 @@
               // підписи всередині стовпців: ім’я (Artikel/Kunde)
               datalabels: {
                 color: '#0b2239',
-                font: { size: 12, weight: '600' },
-                anchor: 'end',
-                align: 'start',      // трохи нижче вершини
-                rotation: -90,       // вертикально
-                clamp: true,
+                font: { size: 14, weight: '700' },
+                anchor: 'start',        // ПРИЧЕПИТИСЯ ДО НИЗУ СТОВПЦЯ (біля осі X)
+                align: 'end',           // зсунути вгору від самої лінії осі
+                rotation: -90,          // вертикально
+                offset: 6,              // невеличкий відступ від осі X
+                clamp: true,            // не виходити за межі полотна
+                clip: false,
                 formatter: (value, ctx) => ctx.chart.data.labels[ctx.dataIndex]
               }
             },
@@ -154,7 +156,7 @@
                   grid: { drawOnChartArea: false } },
             x:  {
               ticks: {
-                display: false   // ховаємо підписи під віссю, бо вони всередині стовпців
+                display: true   // НЕ ховаємо підписи під віссю
               }
             }
           },
