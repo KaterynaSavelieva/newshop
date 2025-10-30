@@ -385,19 +385,15 @@ def report_turnover():
 @login_required
 def report_pareto():
     from datetime import date, timedelta
-    import json
 
     # фільтри
     bis = request.args.get("bis") or date.today().isoformat()
     von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=90)).isoformat()
-    by  = request.args.get("by", "artikel")  # 'artikel' або 'kunde'
+    by  = request.args.get("by", "artikel")  # 'artikel' | 'kunde'
 
-    # SQL за режимом
     if by == "kunde":
         sql = """
-            SELECT kundenID    AS id,
-                   kunde       AS name,
-                   ROUND(SUM(umsatz), 2) AS umsatz
+            SELECT kundenID AS id, kunde AS name, ROUND(SUM(umsatz), 2) AS umsatz
             FROM v_sales
             WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
             GROUP BY kundenID, kunde
@@ -406,9 +402,7 @@ def report_pareto():
         title = "Pareto 80/20 – Umsatz pro Kunde"
     else:
         sql = """
-            SELECT artikelID   AS id,
-                   artikel     AS name,
-                   ROUND(SUM(umsatz), 2) AS umsatz
+            SELECT artikelID AS id, artikel AS name, ROUND(SUM(umsatz), 2) AS umsatz
             FROM v_sales
             WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
             GROUP BY artikelID, artikel
@@ -424,16 +418,13 @@ def report_pareto():
             rows = cur.fetchall()   # [(id, name, umsatz), ...]
         conn.close()
 
-    # підрахунок часток і кумулятиву в Python (надійно і швидко)
     total = float(sum(r[2] for r in rows)) or 1.0
-    data = []
-    cum = 0.0
-    top80_count = 0
-    for idx, (rid, name, umsatz) in enumerate(rows, start=1):
-        share = float(umsatz) / total * 100.0
+    data, cum, top80_count = [], 0.0, 0
+    for i, (rid, name, umsatz) in enumerate(rows, start=1):
+        share = (float(umsatz) / total) * 100.0
         cum += share
         data.append({
-            "rank": idx,
+            "rank": i,
             "id": rid,
             "name": name,
             "umsatz": float(umsatz),
@@ -442,14 +433,14 @@ def report_pareto():
             "in80": cum <= 80.0
         })
         if cum <= 80.0:
-            top80_count = idx
+            top80_count = i
 
     total_items = len(data)
     top80_pct = round((top80_count / total_items) * 100, 1) if total_items else 0.0
 
-    # дані для графіка (перші 25)
-    chart_labels = [d["name"] for d in data[:25]]
-    chart_bars = [d["umsatz"] for d in data[:25]]
+    # графік — перші 25 для читабельності
+    chart_labels   = [d["name"] for d in data[:25]]
+    chart_bars     = [d["umsatz"] for d in data[:25]]
     chart_cum_line = [d["cum_share"] for d in data[:25]]
 
     return render_template(
@@ -458,7 +449,7 @@ def report_pareto():
         by=by, von=von, bis=bis,
         total=round(total, 2),
         top80_count=top80_count,
-        top80_pct=top80_pct,  # <-- додали
+        top80_pct=top80_pct,
         rows=data,
         chart_labels=chart_labels,
         chart_bars=chart_bars,

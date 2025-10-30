@@ -80,6 +80,9 @@
   </div>
 </div>
 
+<!-- плагін для підписів усередині колонок -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
 <script>
   const labels  = {{ chart_labels   | tojson | safe }};
   const barsRaw = {{ chart_bars     | tojson | safe }};
@@ -90,24 +93,20 @@
 
   function buildPareto() {
     try {
-      if (typeof Chart === 'undefined') {
-        console.error('❌ Chart.js not loaded');
-        return;
-      }
-
+      if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
       const cvs = document.getElementById('paretoChart');
-      if (!cvs) {
-        console.error('❌ Canvas #paretoChart not found');
-        return;
-      }
+      const holder = document.getElementById('paretoContainer');
+      if (!cvs || !holder) { console.error('canvas/container not found'); return; }
+      if (!labels.length) { console.warn('no data for chart'); return; }
 
-      // 🧩 Безпечне знищення попереднього графіка
+      // безпечний destroy
       if (window.paretoChart && typeof window.paretoChart.destroy === 'function') {
         window.paretoChart.destroy();
       }
 
-      // 🧠 Побудова нового графіка
       const ctx = cvs.getContext('2d');
+      if (window.ChartDataLabels) { Chart.register(ChartDataLabels); }
+
       window.paretoChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -118,9 +117,19 @@
               label: 'Umsatz (€)',
               data: bars,
               yAxisID: 'y',
-              backgroundColor: 'rgba(54, 162, 235, 0.5)',
+              backgroundColor: 'rgba(54, 162, 235, 0.45)',
               borderColor: 'rgba(54, 162, 235, 1)',
-              borderWidth: 1
+              borderWidth: 1,
+              // підписи всередині стовпців: ім’я (Artikel/Kunde)
+              datalabels: {
+                color: '#0b2239',
+                font: { size: 12, weight: '600' },
+                anchor: 'end',
+                align: 'start',      // трохи нижче вершини
+                rotation: -90,       // вертикально
+                clamp: true,
+                formatter: (value, ctx) => ctx.chart.data.labels[ctx.dataIndex]
+              }
             },
             {
               type: 'line',
@@ -130,7 +139,7 @@
               tension: 0.3,
               pointRadius: 2,
               borderColor: 'rgba(255, 99, 132, 1)',
-              backgroundColor: 'rgba(255, 99, 132, 0.3)',
+              backgroundColor: 'rgba(255, 99, 132, 0.25)',
               fill: false
             }
           ]
@@ -144,44 +153,32 @@
             y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
                   grid: { drawOnChartArea: false } },
             x:  {
-              // показати всі мітки й повернути вертикально
               ticks: {
-                autoSkip: false,
-                minRotation: 90,
-                maxRotation: 90,
-                font: { size: 10 },
-                // коректно беремо текст мітки для категорійної осі
-                callback: function(value /* index */) {
-                  const lab = this.getLabelForValue(value);
-                  return lab;        // або lab.replace(/\s+/g, '\n') — буде багаторядковий підпис
-                }
+                display: false   // ховаємо підписи під віссю, бо вони всередині стовпців
               }
             }
           },
-          plugins: { legend: { display: true } },
-          // колонки вужчі — більше влазить
+          plugins: {
+            legend: { display: true }
+          },
           datasets: {
             bar: {
-              categoryPercentage: 0.8,  // 0..1
+              categoryPercentage: 0.8,
               barPercentage: 0.9
             }
           }
         }
       });
-
-      console.log('✅ Pareto chart built successfully');
     } catch (e) {
-      console.error('❌ Error while building Pareto chart:', e);
+      console.error('Error while building Pareto chart:', e);
     }
   }
 
-  // ⏳ Запуск після завантаження сторінки
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', buildPareto);
-  } else {
-    buildPareto();
-  }
-  window.addEventListener('load', () => setTimeout(buildPareto, 100));
+  (document.readyState === 'loading')
+    ? document.addEventListener('DOMContentLoaded', buildPareto)
+    : buildPareto();
+  window.addEventListener('load', () => setTimeout(buildPareto, 0));
+  window.addEventListener('resize', () => setTimeout(buildPareto, 100));
 </script>
 
 {% endblock %}
