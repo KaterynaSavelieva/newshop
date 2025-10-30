@@ -293,11 +293,11 @@ def report_articles():
 @reports_bp.get("/stock_low")
 @login_required
 def report_stock_low():
-    threshold = request.args.get("limit", "150")
+    threshold = request.args.get("limit", "500")
     try:
         threshold = int(threshold)
     except ValueError:
-        threshold = 450
+        threshold = 500
 
     rows = []
     conn = get_conn()
