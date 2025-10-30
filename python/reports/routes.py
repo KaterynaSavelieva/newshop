@@ -444,6 +444,9 @@ def report_pareto():
         if cum <= 80.0:
             top80_count = idx
 
+    total_items = len(data)
+    top80_pct = round((top80_count / total_items) * 100, 1) if total_items else 0.0
+
     # дані для графіка (перші 25)
     chart_labels = [d["name"] for d in data[:25]]
     chart_bars = [d["umsatz"] for d in data[:25]]
@@ -455,8 +458,9 @@ def report_pareto():
         by=by, von=von, bis=bis,
         total=round(total, 2),
         top80_count=top80_count,
+        top80_pct=top80_pct,  # <-- додали
         rows=data,
-        chart_labels=chart_labels,  # <-- списки, не JSON-рядки
+        chart_labels=chart_labels,
         chart_bars=chart_bars,
         chart_cum_line=chart_cum_line,
     )

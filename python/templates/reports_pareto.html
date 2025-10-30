@@ -30,14 +30,15 @@
 
 <div class="alert alert-info py-2">
   Gesamtumsatz: <b>{{ '%.2f'|format(total) }} €</b>.
-  Top-80% erreichen <b>{{ top80_count }}</b> {{ 'Kunden' if by=='kunde' else 'Artikel' }}.
+  Top-80% erreichen <b>{{ top80_count }}</b>
+  {{ 'Kunden' if by=='kunde' else 'Artikel' }}
+  (<b>{{ '%.1f'|format(top80_pct) }}%</b>).
 </div>
 
 <div class="card mb-3">
   <div class="card-header py-2">Pareto-Diagramm (Balken = Umsatz, Linie = kum. %)</div>
   <div class="card-body">
-    <!-- Контейнер з фіксованою висотою -->
-    <div id="paretoContainer" style="position:relative; width:100%; height:420px;">
+    <div id="paretoContainer" style="position:relative; width:100%; height:460px;">
       <canvas id="paretoChart"></canvas>
     </div>
   </div>
@@ -142,9 +143,29 @@
             y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
             y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
                   grid: { drawOnChartArea: false } },
-            x:  { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 15 } }
+            x:  {
+              // показати всі мітки й повернути вертикально
+              ticks: {
+                autoSkip: false,
+                minRotation: 90,
+                maxRotation: 90,
+                font: { size: 10 },
+                // коректно беремо текст мітки для категорійної осі
+                callback: function(value /* index */) {
+                  const lab = this.getLabelForValue(value);
+                  return lab;        // або lab.replace(/\s+/g, '\n') — буде багаторядковий підпис
+                }
+              }
+            }
           },
-          plugins: { legend: { display: true } }
+          plugins: { legend: { display: true } },
+          // колонки вужчі — більше влазить
+          datasets: {
+            bar: {
+              categoryPercentage: 0.8,  // 0..1
+              barPercentage: 0.9
+            }
+          }
         }
       });
 
