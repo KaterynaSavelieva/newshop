@@ -35,8 +35,11 @@
 
 <div class="card mb-3">
   <div class="card-header py-2">Pareto-Diagramm (Balken = Umsatz, Linie = kum. %)</div>
-  <div class="card-body" style="min-height:420px">
-    <canvas id="paretoChart" height="420"></canvas>
+  <div class="card-body">
+    <!-- Контейнер з фіксованою висотою -->
+    <div id="paretoContainer" style="position:relative; width:100%; height:420px;">
+      <canvas id="paretoChart"></canvas>
+    </div>
   </div>
 </div>
 
@@ -84,8 +87,13 @@
   function buildPareto() {
     if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
     const cvs = document.getElementById('paretoChart');
-    if (!cvs) { console.error('canvas not found'); return; }
-    if (!labels?.length) { console.warn('no data for chart'); return; }
+    const holder = document.getElementById('paretoContainer');
+    if (!cvs || !holder) { console.error('canvas/container not found'); return; }
+    if (!labels.length) { console.warn('no data for chart'); return; }
+
+    // ВАЖЛИВО: Canvas повинен зайняти контейнер
+    cvs.width  = holder.clientWidth;
+    cvs.height = holder.clientHeight;
 
     const ctx = cvs.getContext('2d');
     if (window.paretoChart) window.paretoChart.destroy();
@@ -101,7 +109,7 @@
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: false,   // працюємо по висоті контейнера
         interaction: { mode: 'index', intersect: false },
         scales: {
           y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
@@ -112,12 +120,17 @@
         plugins: { legend: { display: true } }
       }
     });
+    console.log('Pareto намальовано ✅', {w: cvs.width, h: cvs.height});
   }
 
-  (document.readyState === 'loading')
-    ? document.addEventListener('DOMContentLoaded', buildPareto)
-    : buildPareto();
+  // Після DOM і після повного завантаження (на випадок, якщо ширина ще 0)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', buildPareto);
+  } else {
+    buildPareto();
+  }
   window.addEventListener('load', () => setTimeout(buildPareto, 0));
+  window.addEventListener('resize', () => setTimeout(buildPareto, 100)); // підлаштування при ресайзі
 </script>
 
 {% endblock %}
