@@ -1,12 +1,30 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
-from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_login import (
+    LoginManager, login_user, logout_user,
+    login_required, UserMixin, current_user
+)
 from werkzeug.security import check_password_hash
 from ..db import get_conn
 
 auth_bp = Blueprint("auth", __name__)
 
+
+# ---- Модель користувача (доступна і в load_user, і в login) ----
+class User(UserMixin):
+    def __init__(self, uid, email, name, role, is_active):
+        self.id = str(uid)          # Flask-Login очікує .id (str)
+        self.email = email
+        self.name = name
+        self.role = role
+        self._active = bool(is_active)
+
+    @property
+    def is_active(self):
+        return self._active
+
+
 def init_auth(login_manager: LoginManager):
-    # УВЕСЬ код, що налаштовує login_manager — лише тут!
+    """Увесь код конфігурації login_manager — тут."""
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Please log in to access this page."
     login_manager.login_message_category = "warning"
@@ -17,29 +35,26 @@ def init_auth(login_manager: LoginManager):
         if not conn:
             return None
         with conn.cursor() as cur:
-            cur.execute("SELECT id, email, name, role, is_active FROM users WHERE id=%s", (user_id,))
+            cur.execute(
+                "SELECT id, email, name, role, is_active FROM users WHERE id=%s",
+                (user_id,)
+            )
             row = cur.fetchone()
         conn.close()
         if not row:
             return None
-        # невеличка локальна модель
-        class User(UserMixin):
-            def __init__(self, id, email, name, role, is_active):
-                self.id = str(id)
-                self.email = email
-                self.name = name
-                self.role = role
-                self.active = bool(is_active)
-            def is_active(self): return self.active
+        # row: (id, email, name, role, is_active)
         return User(*row)
 
-# ── Роути ──
+
+# ---- Роути ----
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
 
     error = None
+
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
@@ -53,14 +68,14 @@ def login():
                     FROM users
                     WHERE email=%s AND is_active=1
                     """,
-                    (email,)
+                    (email,),
                 )
                 row = cur.fetchone()
             conn.close()
 
             if row:
                 uid, uemail, uname, urole, uactive, phash = row
-                if check_password_hash(phash, password):
+                if phash and check_password_hash(phash, password):
                     login_user(User(uid, uemail, uname, urole, uactive))
                     flash("Erfolgreich eingeloggt.", "success")
                     return redirect(url_for("index"))
@@ -72,6 +87,7 @@ def login():
             error = "Datenbankverbindung fehlgeschlagen."
 
     return render_template("login.html", title="Anmelden", error=error)
+
 
 @auth_bp.get("/logout")
 @login_required

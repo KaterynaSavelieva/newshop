@@ -44,15 +44,15 @@ def get_conn():
                     cursorclass=Cursor,
                     connect_timeout=4
                 )
-                print(f"✅ Підключення успішне: {host}:{port}")
+                print(f"Verbindung erfolgreich: {host}:{port}")
                 return conn
             except Exception as e:
-                print(f"⚠️ Не вдалося підключитись до {host}:{port} → {e}")
+                print(f"Verbindung konnte nicht hergestellt werden {host}:{port} → {e}")
                 last_err = e
 
-    print("❌ Не вдалося підключитись до жодного сервера.")
+    print("Es konnte keine Verbindung zu einem Server hergestellt werden.")
     if last_err:
-        print(f"Остання помилка: {last_err}")
+        print(f"Letzter Fehler: {last_err}")
     return None
 
 
@@ -73,7 +73,7 @@ def fetch_all(cur, sql, params=None):
 if __name__ == "__main__":
     conn = get_conn()
     if conn:
-        print("База даних доступна!")
+        print("Datenbank verfügbar!")
         conn.close()
     else:
-        print("Підключення відсутнє.")
+        print("Es besteht keine Verbindung.")
