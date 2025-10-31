@@ -54,13 +54,13 @@ newshop/
 
 ## 🚀 **Installation & Start**
 
-### 1️⃣ Voraussetzungen
+### 1️. Voraussetzungen
 - Raspberry Pi 4 oder 5 mit **Raspberry Pi OS**
 - **Python 3.11+**
 - **MySQL 8.x**
 - Virtuelle Umgebung `.venv` (optional)
 
-### 2️⃣ Setup der Umgebung
+### 2️. Setup der Umgebung
 
 ```bash
 git clone https://github.com/KaterynaSavelieva/newshopdb.git
@@ -70,7 +70,7 @@ source .venv/bin/activate   # oder: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3️⃣ MySQL-Datenbank vorbereiten
+### 3️. MySQL-Datenbank vorbereiten
 
 ```
 mysql -u root -p
@@ -82,7 +82,7 @@ SOURCE sql/views.sql;
 -- SOURCE sql/triggers.sql;
 ```
 
-### 4️⃣ Generierung historischer Daten
+### 4️. Generierung historischer Daten
 
 > ⚠️ Trigger sollten dabei deaktiviert sein, da der Python-Code Lagerbestand und Durchschnittskosten selbst aktualisiert.
 
@@ -95,7 +95,7 @@ Erzeugt:
 - Verkäufe (04.01.2024–30.10.2025)
 - Automatische Nachbestellungen bei Bedarf
 
-### 5️⃣ Web-Dashboard starten
+### 5️. Web-Dashboard starten
 ```flask --app python.dashboard.routes run --host=0.0.0.0 --port=5000```
 
 Dann im Browser öffnen:
