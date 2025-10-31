@@ -380,73 +380,95 @@ def report_turnover():
     )
 
 
+
 # --- Pareto 80/20 ---
 @reports_bp.get("/pareto")
 @login_required
 def report_pareto():
     from datetime import date, timedelta
 
-    # фільтри
+    # ── Фільтри
     bis = request.args.get("bis") or date.today().isoformat()
     von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=90)).isoformat()
-    by  = request.args.get("by", "artikel")  # 'artikel' | 'kunde'
+    by  = request.args.get("by", "artikel")     # 'artikel' | 'kunde'
+    k   = request.args.get("k", "umsatz")       # 'umsatz' | 'marge'
 
+    # ── Валідація параметра метрики
+    k = k.lower()
+    if k not in ("umsatz", "marge"):
+        k = "umsatz"
+
+    # ── Вибір поля з v_sales
+    metric_col = "SUM(umsatz)" if k == "umsatz" else "SUM(marge)"
+    metric_label = "Umsatz (€)" if k == "umsatz" else "Marge (€)"
+    page_title = f"Pareto 80/20 – {metric_label} pro {'Artikel' if by=='artikel' else 'Kunde'}"
+
+    # ── SQL (агрегація по вибраній метриці)
     if by == "kunde":
-        sql = """
-            SELECT kundenID AS id, kunde AS name, ROUND(SUM(umsatz), 2) AS umsatz
+        sql = f"""
+            SELECT
+                kundenID   AS id,
+                kunde      AS name,
+                ROUND({metric_col}, 2) AS metric
             FROM v_sales
             WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
             GROUP BY kundenID, kunde
-            ORDER BY umsatz DESC
+            ORDER BY metric DESC
         """
-        title = "Pareto 80/20 – Umsatz pro Kunde"
     else:
-        sql = """
-            SELECT artikelID AS id, artikel AS name, ROUND(SUM(umsatz), 2) AS umsatz
+        sql = f"""
+            SELECT
+                artikelID  AS id,
+                artikel    AS name,
+                ROUND({metric_col}, 2) AS metric
             FROM v_sales
             WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
             GROUP BY artikelID, artikel
-            ORDER BY umsatz DESC
+            ORDER BY metric DESC
         """
-        title = "Pareto 80/20 – Umsatz pro Artikel"
 
     rows = []
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
             cur.execute(sql, (von, bis))
-            rows = cur.fetchall()   # [(id, name, umsatz), ...]
+            rows = cur.fetchall()   # [(id, name, metric), ...]
         conn.close()
 
+    # ── Обрахунок часток і кумулятиву
     total = float(sum(r[2] for r in rows)) or 1.0
     data, cum, top80_count = [], 0.0, 0
-    for i, (rid, name, umsatz) in enumerate(rows, start=1):
-        share = (float(umsatz) / total) * 100.0
+    for i, (rid, name, val) in enumerate(rows, start=1):
+        value = float(val)
+        share = (value / total) * 100.0
         cum += share
-        data.append({
+        d = {
             "rank": i,
             "id": rid,
             "name": name,
-            "umsatz": float(umsatz),
+            "value": round(value, 2),
             "share": round(share, 2),
             "cum_share": round(cum, 2),
             "in80": cum <= 80.0
-        })
-        if cum <= 80.0:
+        }
+        data.append(d)
+        if d["in80"]:
             top80_count = i
 
     total_items = len(data)
     top80_pct = round((top80_count / total_items) * 100, 1) if total_items else 0.0
 
-    # графік — перші 25 для читабельності
+    # ── Графік: беремо перші 25 барів (читабельність)
     chart_labels   = [d["name"] for d in data[:25]]
-    chart_bars     = [d["umsatz"] for d in data[:25]]
+    chart_bars     = [d["value"] for d in data[:25]]
     chart_cum_line = [d["cum_share"] for d in data[:25]]
 
     return render_template(
         "reports_pareto.html",
-        title=title,
+        title=page_title,
         by=by, von=von, bis=bis,
+        k=k,                              # поточна метрика
+        metric_label=metric_label,        # текст для легенди/шапки
         total=round(total, 2),
         top80_count=top80_count,
         top80_pct=top80_pct,

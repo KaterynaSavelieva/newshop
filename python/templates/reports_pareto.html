@@ -18,8 +18,16 @@
   <div class="col-auto">
     <label class="form-label" for="by">Modus</label>
     <select id="by" name="by" class="form-select">
-      <option value="artikel" {% if by =='artikel' %}selected{% endif %}>Artikel</option>
-      <option value="kunde"   {% if by =='kunde'   %}selected{% endif %}>Kunde</option>
+      <option value="artikel" {% if by=='artikel' %}selected{% endif %}>Artikel</option>
+      <option value="kunde"   {% if by=='kunde'   %}selected{% endif %}>Kunde</option>
+    </select>
+  </div>
+
+  <div class="col-auto">
+    <label class="form-label" for="k">Kriterium</label>
+    <select id="k" name="k" class="form-select">
+      <option value="umsatz" {% if k=='umsatz' %}selected{% endif %}>Umsatz (€)</option>
+      <option value="marge"  {% if k=='marge'  %}selected{% endif %}>Marge (€)</option>
     </select>
   </div>
 
@@ -29,14 +37,14 @@
 </form>
 
 <div class="alert alert-info py-2">
-  Gesamtumsatz: <b>{{ '%.2f'|format(total) }} €</b>.
+  Gesamt<strong>{{ ' ' + metric_label }}</strong>: <b>{{ '%.2f'|format(total) }}</b>.
   Top-80% erreichen <b>{{ top80_count }}</b>
   {{ 'Kunden' if by=='kunde' else 'Artikel' }}
   (<b>{{ '%.1f'|format(top80_pct) }}%</b>).
 </div>
 
 <div class="card mb-3">
-  <div class="card-header py-2">Pareto-Diagramm (Balken = Umsatz, Linie = kum. %)</div>
+  <div class="card-header py-2">Pareto-Diagramm (Balken = {{ metric_label }}, Linie = kum. %)</div>
   <div class="card-body">
     <div id="paretoContainer" style="position:relative; width:100%; height:460px;">
       <canvas id="paretoChart"></canvas>
@@ -45,14 +53,14 @@
 </div>
 
 <div class="card">
-  <div class="card-header py-2">Tabelle (nach Umsatz absteigend)</div>
+  <div class="card-header py-2">Tabelle (nach {{ metric_label }} absteigend)</div>
   <div class="table-responsive">
     <table class="table table-sm table-striped table-bordered mb-0 align-middle">
       <thead class="table-light">
         <tr>
           <th>#</th>
           <th>{{ 'Kunde' if by=='kunde' else 'Artikel' }}</th>
-          <th class="text-end">Umsatz (€)</th>
+          <th class="text-end">{{ metric_label }}</th>
           <th class="text-end">Anteil (%)</th>
           <th class="text-end">Kumulativ (%)</th>
           <th>Top 80%</th>
@@ -63,7 +71,7 @@
         <tr>
           <td>{{ r.rank }}</td>
           <td>{{ r.name }}</td>
-          <td class="text-end">{{ '%.2f'|format(r.umsatz) }}</td>
+          <td class="text-end">{{ '%.2f'|format(r.value) }}</td>
           <td class="text-end">{{ '%.2f'|format(r.share) }}</td>
           <td class="text-end">{{ '%.2f'|format(r.cum_share) }}</td>
           <td>
@@ -80,26 +88,25 @@
   </div>
 </div>
 
-<!-- плагін для підписів усередині колонок -->
+<!-- Chart.js + плагін підписів -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
 <script>
   const labels  = {{ chart_labels   | tojson | safe }};
   const barsRaw = {{ chart_bars     | tojson | safe }};
   const cumRaw  = {{ chart_cum_line | tojson | safe }};
+  const metricLabel = {{ metric_label|tojson|safe }};
 
   const bars    = Array.isArray(barsRaw) ? barsRaw.map(v => Number(v) || 0) : [];
   const cumLine = Array.isArray(cumRaw)  ? cumRaw.map(v => Number(v) || 0)  : [];
 
   function buildPareto() {
     try {
-      if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
+      if (typeof Chart === 'undefined') return;
       const cvs = document.getElementById('paretoChart');
-      const holder = document.getElementById('paretoContainer');
-      if (!cvs || !holder) { console.error('canvas/container not found'); return; }
-      if (!labels.length) { console.warn('no data for chart'); return; }
+      if (!cvs || !labels.length) return;
 
-      // безпечний destroy
       if (window.paretoChart && typeof window.paretoChart.destroy === 'function') {
         window.paretoChart.destroy();
       }
@@ -114,21 +121,20 @@
           datasets: [
             {
               type: 'bar',
-              label: 'Umsatz (€)',
+              label: metricLabel,
               data: bars,
               yAxisID: 'y',
               backgroundColor: 'rgba(54, 162, 235, 0.45)',
               borderColor: 'rgba(54, 162, 235, 1)',
               borderWidth: 1,
-              // підписи всередині стовпців: ім’я (Artikel/Kunde)
               datalabels: {
                 color: '#0b2239',
-                font: { size: 14, weight: 'normal' }, // нормальний шрифт
-                anchor: 'start',        // ПРИЧЕПИТИСЯ ДО НИЗУ СТОВПЦЯ (біля осі X)
-                align: 'end',           // зсунути вгору від самої лінії осі
-                rotation: -90,          // вертикально
-                offset: 6,              // невеличкий відступ від осі X
-                clamp: true,            // не виходити за межі полотна
+                font: { size: 14, weight: 'normal' },
+                anchor: 'start',
+                align: 'end',
+                rotation: -90,
+                offset: 6,
+                clamp: true,
                 clip: false,
                 formatter: (value, ctx) => ctx.chart.data.labels[ctx.dataIndex]
               }
@@ -143,7 +149,7 @@
               borderColor: 'rgba(255, 99, 132, 1)',
               backgroundColor: 'rgba(255, 99, 132, 0.25)',
               fill: false,
-              datalabels: { display: false } // ❌ прибирає підписи з лінії
+              datalabels: { display: false }
             }
           ]
         },
@@ -152,28 +158,21 @@
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           scales: {
-            y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
+            y:  { title: { display: true, text: metricLabel }, beginAtZero: true },
             y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
                   grid: { drawOnChartArea: false } },
-            x:  {
-              ticks: {
-                display: false   //  ховаємо підписи під віссю
-              }
-            }
+            x:  { ticks: { display: false } }
           },
           plugins: {
             legend: { display: true }
           },
           datasets: {
-            bar: {
-              categoryPercentage: 0.8,
-              barPercentage: 0.9
-            }
+            bar: { categoryPercentage: 0.8, barPercentage: 0.9 }
           }
         }
       });
     } catch (e) {
-      console.error('Error while building Pareto chart:', e);
+      console.error('Pareto build error:', e);
     }
   }
 
