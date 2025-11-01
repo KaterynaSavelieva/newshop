@@ -88,6 +88,29 @@ def inject_user():
 
 
 # ----------------------------------------------
+# 💶 Eigener Template-Filter für Zahlenformat (ohne Euro-Symbol)
+# ----------------------------------------------
+@app.template_filter("zahl")
+def format_euro(value):
+    """
+    Formatiert eine Zahl im deutschen Stil (z. B. 28 592,81)
+    ohne das Euro-Symbol.
+    Wird in den HTML-Templates mit {{ wert | zahl }} verwendet.
+    """
+    try:
+        # 1️⃣ Zahl mit 2 Dezimalstellen formatieren → 28,592.81
+        # 2️⃣ Kommas (Tausender) durch Leerzeichen ersetzen → 28 592.81
+        # 3️⃣ Dezimalpunkt durch Komma ersetzen → 28 592,81
+        formatted = f"{value:,.2f}" \
+            .replace(",", " ") \
+            .replace(".", ",")
+        return formatted
+    except (ValueError, TypeError):
+        # Wenn kein gültiger Zahlenwert (z. B. None) → Strich anzeigen
+        return "-"
+
+
+# ----------------------------------------------
 # 🔹 App starten
 # ----------------------------------------------
 if __name__ == "__main__":

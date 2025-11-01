@@ -18,7 +18,7 @@
                         <th class="text-end">Menge</th>
                         <th class="text-end">VK (€)</th>
                         <th class="text-end">EK (€)</th>
-                        <th class="text-end">EK (€)</th>
+                        <th class="text-end">RBT (€)</th>
                         <th class="text-end">Umsatz (€)</th>
                         <th class="text-end">Kosten (€)</th>
                         <th class="text-end">Marge (€)</th>
@@ -32,12 +32,12 @@
                         <td>{{ r[2] }}</td>
                         <td>{{ r[3] }}</td>
                         <td class="text-end">{{ r[4] }}</td>
-                        <td class="text-end">{{ '%.2f'|format(r[5]) }}</td>
-                        <td class="text-end">{{ '%.2f'|format(r[6]) }}</td>
-                        <td class="text-end">{{ '%.2f'|format(r[7]) }}</td>
-                        <td class="text-end">{{ '%.2f'|format(r[8]) }}</td>
-                        <td class="text-end">{{ '%.2f'|format(r[9]) }}</td>
-                        <td class="text-end">{{ '%.2f'|format(r[10]) }}</td>
+                        <td class="text-end">{{ r[5] | zahl }}</td>
+                        <td class="text-end">{{ r[6] | zahl }}</td>
+                        <td class="text-end">{{ r[7] | zahl }}</td>
+                        <td class="text-end">{{ r[8] | zahl }}</td>
+                        <td class="text-end">{{ r[9] | zahl }}</td>
+                        <td class="text-end">{{ r[10] | zahl }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
