@@ -31,13 +31,13 @@
                         <td>{{ r[1] }}</td>
                         <td>{{ r[2] }}</td>
                         <td>{{ r[3] }}</td>
-                        <td class="text-end">{{ r[4] | int }}</td>
-                        <td class="text-end">{{ r[5] | euro }}</td>
-                        <td class="text-end">{{ r[6] | euro }}</td>
-                        <td class="text-end">{{ r[7] | euro }}</td>
-                        <td class="text-end">{{ r[8] | euro }}</td>
-                        <td class="text-end">{{ r[9] | euro }}</td>
-                        <td class="text-end">{{ r[10] | euro }}</td>
+                        <td class="text-end">{{ r[4] | thousands(0) }}</td>
+                        <td class="text-end">{{ r[5] | thousands }}</td>
+                        <td class="text-end">{{ r[6] | thousands }}</td>
+                        <td class="text-end">{{ r[7] | thousands }}</td>
+                        <td class="text-end">{{ r[8] | thousands }}</td>
+                        <td class="text-end">{{ r[9] | thousands }}</td>
+                        <td class="text-end">{{ r[10] | thousands }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

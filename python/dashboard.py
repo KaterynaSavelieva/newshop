@@ -90,23 +90,18 @@ def inject_user():
 # ----------------------------------------------
 # 💶 Eigener Template-Filter für Zahlenformat (ohne Euro-Symbol)
 # ----------------------------------------------
-@app.template_filter("euro")
-def format_euro(value):
+@app.template_filter("thousands")
+def format_thousands (value, decimals=2):
     """
-    Formatiert eine Zahl im deutschen Stil (z. B. 28 592,81)
-    ohne das Euro-Symbol.
-    Wird in den HTML-Templates mit {{ wert | zahl }} verwendet.
+    Formatiert Zahlen im deutschen Stil (Leerzeichen für Tausender, Komma für Dezimaltrennzeichen).
+    Beispiel:
+      euro(28592.81) → 28 592,81
+      euro(12456, 0) → 12 456
     """
     try:
-        # 1️⃣ Zahl mit 2 Dezimalstellen formatieren → 28,592.81
-        # 2️⃣ Kommas (Tausender) durch Leerzeichen ersetzen → 28 592.81
-        # 3️⃣ Dezimalpunkt durch Komma ersetzen → 28 592,81
-        formatted = f"{value:,.2f}" \
-            .replace(",", " ") \
-            .replace(".", ",")
+        formatted = f"{value:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", " ")
         return formatted
     except (ValueError, TypeError):
-        # Wenn kein gültiger Zahlenwert (z. B. None) → Strich anzeigen
         return "-"
 
 
