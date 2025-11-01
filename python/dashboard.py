@@ -9,7 +9,7 @@ import os
 from flask import Flask, render_template, redirect, url_for
 from flask_login import LoginManager, login_required, current_user
 
-# 🔹 Eigene Module importieren (Datenbank, Login, Reports)
+# Eigene Module importieren (Datenbank, Login, Reports)
 from .db import get_conn
 from .auth import auth_bp, init_auth
 from .reports.routes import reports_bp
@@ -33,16 +33,15 @@ def home():
     return render_template("dashboard_home.html", title="NewShop Dashboard")
 
 # Dashboard-Tabelle mit Verkaufsdaten
-@dashboard_bp.get("/dashboard")
-@login_required
+@dashboard_bp.get("/dashboard")          # Route für die Seite /dashboard
+@login_required                          # Zugriff nur für eingeloggte Benutzer
 def table():
-    rows = []
-    totals = {"umsatz": 0.0, "kosten": 0.0, "marge": 0.0}  # Anfangswerte
+    rows = []                            # Liste für Verkaufszeilen (Transaktionen)
 
-    conn = get_conn()
+    conn = get_conn()                    # Verbindung zur Datenbank herstellen
     if conn:
-        with conn.cursor() as cur:
-            # SQL-Abfrage: letzte 100 Verkäufe aus der Sicht v_sales
+        with conn.cursor() as cur:       # Cursor öffnen, um SQL-Abfragen auszuführen
+            # SQL-Abfrage: die letzten 100 Verkäufe aus der Sicht (View) v_sales
             cur.execute("""
                 SELECT verkaufsdatum, kunde, kundentyp, artikel, menge,
                        vk_preis, rabatt_preis, ek_preis, umsatz, kosten, marge
@@ -50,63 +49,43 @@ def table():
                 ORDER BY verkaufsdatum DESC
                 LIMIT 100
             """)
-            rows = cur.fetchall()
-        conn.close()
+            rows = cur.fetchall()        # Ergebnisse abholen
+        conn.close()                     # Verbindung schließen
 
-        # Gesamtsummen berechnen
-        if rows:
-            totals["umsatz"] = float(sum(r[8] for r in rows))
-            totals["kosten"] = float(sum(r[9] for r in rows))
-            totals["marge"]  = float(sum(r[10] for r in rows))
-
-    return render_template("dashboard.html", rows=rows, totals=totals, title="Dashboard")
+    # HTML-Template rendern und Daten an die Seite übergeben
+    return render_template("dashboard.html",
+                           rows=rows,
+                           title="Dashboard")
+# ========================================
 
 
-# ----------------------------------------------
-# 🔹 Healthcheck – zeigt, dass der Server läuft
-# ----------------------------------------------
+#  Healthcheck – zeigt, dass der Server läuft
 @app.get("/health")
 def health():
     return {"status": "ok"}  # JSON-Antwort
 
-
-# ----------------------------------------------
-# 🔹 Blueprints registrieren
-# ----------------------------------------------
+# Blueprints registrieren
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(reports_bp)
 
-
-# ----------------------------------------------
-# 🔹 Benutzer-Information global für Templates
-# ----------------------------------------------
+# Benutzer-Information global für Templates
 @app.context_processor
 def inject_user():
     # current_user steht dann automatisch in allen HTML-Templates zur Verfügung
     return dict(current_user=current_user)
 
 
-# ----------------------------------------------
-# 💶 Eigener Template-Filter für Zahlenformat (ohne Euro-Symbol)
-# ----------------------------------------------
+# Eigener Template-Filter für Zahlenformat
 @app.template_filter("thousands")
 def format_thousands (value, decimals=2):
-    """
-    Formatiert Zahlen im deutschen Stil (Leerzeichen für Tausender, Komma für Dezimaltrennzeichen).
-    Beispiel:
-      euro(28592.81) → 28 592,81
-      euro(12456, 0) → 12 456
-    """
     try:
         formatted = f"{value:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", " ")
         return formatted
     except (ValueError, TypeError):
-        return "-"
+        return "k. A."   # keine Angabe → немає даних
 
 
-# ----------------------------------------------
-# 🔹 App starten
-# ----------------------------------------------
+#  App starten
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

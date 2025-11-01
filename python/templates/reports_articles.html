@@ -200,7 +200,7 @@
                 <th class="text-end">{{ totals.marge  | thousands }}</th>
                 <th class="text-end">
                     {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
-                    {{ marge_pct_total | round(2) }} %
+                    {{ marge_pct_total | thousands(2) }} %
                 </th>
             </tr>
         </tfoot>
