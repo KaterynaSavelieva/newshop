@@ -171,7 +171,7 @@
                 <td class="text-end">{{ r[4] | thousands }}</td>
                 <td class="text-end">{{ r[5] | thousands }}</td>
                 <td class="text-end">{{ r[6] | thousands }}</td>
-                <td class="text-end">{{ r[7] | thousands }}</td>
+                <td class="text-end">{{ r[7] | thousands(2) }} %</td>
             </tr>
             {% endfor %}
             {% else %}
@@ -179,12 +179,12 @@
             <tr>
                 <td>{{ loop.index }}</td>
                 <td>{{ r[0] }}</td>
-                <td>{{ r[1] }}</td>
+                <td class="text-end">{{ r[1] | thousands(0) }}</td>
                 <td class="text-end">{{ r[2] | thousands(0) }}</td>
                 <td class="text-end">{{ r[3] | thousands }}</td>
                 <td class="text-end">{{ r[4] | thousands }}</td>
                 <td class="text-end">{{ r[5] | thousands }}</td>
-                <td class="text-end">{{ r[6] | thousands }}</td>
+                <td class="text-end">{{ r[6] | thousands(2) }} %</td>
             </tr>
             {% endfor %}
             {% endif %}
@@ -193,7 +193,7 @@
         <tfoot class="table-light fw-bold">
             <tr>
                 <th colspan="2">Summe</th>
-                <th class="text-end">{{ totals.positionen | int }}</th>
+                <th class="text-end">{{ totals.positionen | thousands(0) }}</th>
                 <th class="text-end">{{ totals.menge | thousands(0) }}</th>
                 <th class="text-end">{{ totals.umsatz | thousands }}</th>
                 <th class="text-end">{{ totals.kosten | thousands }}</th>
