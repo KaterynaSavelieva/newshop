@@ -167,11 +167,11 @@
                 <td>{{ loop.index }}</td>
                 <td>{{ r[1] }}</td>
                 <td>{{ r[2] }}</td>
-                <td>{{ '%.0f'|format(r[3]) }}</td>
-                <td>{{ '%.2f'|format(r[4]) }}</td>
-                <td>{{ '%.2f'|format(r[5]) }}</td>
-                <td>{{ '%.2f'|format(r[6]) }}</td>
-                <td>{{ '%.2f'|format(r[7]) }}</td>
+                <td class="text-end">{{ r[3] | int }}</td>
+                <td class="text-end">{{ r[4] | euro }}</td>
+                <td class="text-end">{{ r[5] | euro }}</td>
+                <td class="text-end">{{ r[6] | euro }}</td>
+                <td class="text-end">{{ r[7] | euro }}</td>
             </tr>
             {% endfor %}
             {% else %}
@@ -180,27 +180,27 @@
                 <td>{{ loop.index }}</td>
                 <td>{{ r[0] }}</td>
                 <td>{{ r[1] }}</td>
-                <td>{{ '%.0f'|format(r[2]) }}</td>
-                <td>{{ '%.2f'|format(r[3]) }}</td>
-                <td>{{ '%.2f'|format(r[4]) }}</td>
-                <td>{{ '%.2f'|format(r[5]) }}</td>
-                <td>{{ '%.2f'|format(r[6]) }}</td>
+                <td class="text-end">{{ r[2] | int }}</td>
+                <td class="text-end">{{ r[3] | euro }}</td>
+                <td class="text-end">{{ r[4] | euro }}</td>
+                <td class="text-end">{{ r[5] | euro }}</td>
+                <td class="text-end">{{ r[6] | euro }}</td>
             </tr>
             {% endfor %}
             {% endif %}
         </tbody>
 
-        <tfoot class="table-light">
+        <tfoot class="table-light fw-bold">
             <tr>
                 <th colspan="2">Summe</th>
-                <th>{{ totals.positionen }}</th>
-                <th>{{ '%.0f'|format(totals.menge) }}</th>
-                <th>{{ '%.2f'|format(totals.umsatz) }}</th>
-                <th>{{ '%.2f'|format(totals.kosten) }}</th>
-                <th>{{ '%.2f'|format(totals.marge) }}</th>
-                <th>
+                <th class="text-end">{{ totals.positionen | int }}</th>
+                <th class="text-end">{{ totals.menge | int }}</th>
+                <th class="text-end">{{ totals.umsatz | euro }}</th>
+                <th class="text-end">{{ totals.kosten | euro }}</th>
+                <th class="text-end">{{ totals.marge  | euro }}</th>
+                <th class="text-end">
                     {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
-                    {{ '%.2f'|format(marge_pct_total) }}
+                    {{ marge_pct_total | round(2) }} %
                 </th>
             </tr>
         </tfoot>

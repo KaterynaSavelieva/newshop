@@ -90,7 +90,7 @@ def inject_user():
 # ----------------------------------------------
 # 💶 Eigener Template-Filter für Zahlenformat (ohne Euro-Symbol)
 # ----------------------------------------------
-@app.template_filter("zahl")
+@app.template_filter("euro")
 def format_euro(value):
     """
     Formatiert eine Zahl im deutschen Stil (z. B. 28 592,81)
