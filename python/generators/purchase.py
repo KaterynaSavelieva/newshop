@@ -9,8 +9,8 @@ from datetime import datetime
 from db import get_conn
 
 def fetch_low_stock(cur):
-    # товари з запасом < 450
-    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 450;")
+    # товари з запасом < 1000
+    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 1000;")
     return cur.fetchall()  # [(artikelID, name, bestand), ...]
 
 def pick_random_supplier(cur, artikel_id):
@@ -49,7 +49,7 @@ def main():
         with conn.cursor() as cur:
             low = fetch_low_stock(cur)
             if not low:
-                print("Es gibt keine Produkte mit einem Lagerbestand von < 450. Kein Kauf erforderlich.")
+                print("Es gibt keine Produkte mit einem Lagerbestand von < 1000. Kein Kauf erforderlich.")
                 return
 
             # згрупуємо товари за постачальником: {lieferantID: [(artikelID, menge, preis), ...]}
