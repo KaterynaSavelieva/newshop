@@ -481,102 +481,140 @@ def report_turnover():
         rows_json=json.dumps(rows_dict) # Hauptdaten für JS
     )
 
-
-# ️ Pareto 80/20 (Umsatz oder Marge)
-# URL: /reports/pareto?by=artikel|kunde&k=umsatz|marge&von=…&bis=…
+# ️Pareto 80/20 (Umsatz/Marge) + Typ, Marge, Summen + режим "kundentyp"
+# URL-приклади:
+#   /reports/pareto?by=kunde&k=umsatz&von=2025-08-01&bis=2025-11-01
+#   /reports/pareto?by=kundentyp&k=marge
 @reports_bp.get("/pareto")
 @login_required
 def report_pareto():
-    # Zeitraum (Standard: letzte 90 Tage)
+    # Zeitraum (стандарт: останні 90 днів)
     von, bis = f_get_period(90)
 
-    # Dimension: nach Artikel oder Kunde gruppieren?
-    by = request.args.get("by", "artikel")  # 'artikel' | 'kunde'
-    # Kennzahl: Umsatz oder Marge betrachten?
-    k  = request.args.get("k", "umsatz")    # 'umsatz' | 'marge'
+    # Міряємо по чому: artikel | kunde | kundentyp
+    by = request.args.get("by", "artikel").lower()
+    if by not in ("artikel", "kunde", "kundentyp"):
+        by = "artikel"
 
-    # Metrik absichern
-    k = k.lower()
+    # Яка метрика визначає сортування/діаграму: umsatz | marge
+    k = request.args.get("k", "umsatz").lower()
     if k not in ("umsatz", "marge"):
         k = "umsatz"
 
-    # SQL-Spalte für Aggregation definieren + lesbare Beschriftung
-    metric_col   = "SUM(umsatz)" if k == "umsatz" else "SUM(marge)"
-    metric_label = "Umsatz (€)"   if k == "umsatz" else "Marge (€)"
-    page_title   = f"Pareto 80/20 – {metric_label} pro {'Artikel' if by=='artikel' else 'Kunde'}"
+    # Текст для заголовка/легенди
+    metric_label = "Umsatz (€)" if k == "umsatz" else "Marge (€)"
+    dim_label = {"artikel": "Artikel", "kunde": "Kunde", "kundentyp": "Kundentyp"}[by]
+    page_title = f"Pareto 80/20 – {metric_label} pro {dim_label}"
 
-    # SQL je nach Dimension zusammenstellen
-    if by == "kunde":
-        sql = f"""
+    # --- SQL: беремо одразу і Umsatz, і Marge (зручно для таблиці й підсумків) ---
+    if by == "artikel":
+        sql = """
             SELECT
-                kundenID   AS id,
-                kunde      AS name,
-                ROUND({metric_col}, 2) AS metric
+                artikelID            AS id,
+                artikel              AS name,
+                NULL                 AS typ,     -- для артикулів типу немає
+                ROUND(SUM(umsatz),2) AS umsatz,
+                ROUND(SUM(marge),2)  AS marge
             FROM v_sales
-            WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
-            GROUP BY kundenID, kunde
-            ORDER BY metric DESC
-        """
-    else:
-        sql = f"""
-            SELECT
-                artikelID  AS id,
-                artikel    AS name,
-                ROUND({metric_col}, 2) AS metric
-            FROM v_sales
-            WHERE verkaufsdatum >= %s AND verkaufsdatum <= %s
+            WHERE verkaufsdatum BETWEEN %s AND %s
             GROUP BY artikelID, artikel
-            ORDER BY metric DESC
+            ORDER BY {order_col} DESC
         """
+    elif by == "kunde":
+        # додаємо тип клієнта
+        sql = """
+            SELECT
+                vs.kundenID          AS id,
+                vs.kunde             AS name,
+                COALESCE(kt.bezeichnung,'Standard') AS typ,
+                ROUND(SUM(vs.umsatz),2) AS umsatz,
+                ROUND(SUM(vs.marge),2)  AS marge
+            FROM v_sales vs
+            LEFT JOIN kunden k  ON k.kundenID = vs.kundenID
+            LEFT JOIN kundentyp kt ON kt.kundentypID = k.kundentypID
+            WHERE vs.verkaufsdatum BETWEEN %s AND %s
+            GROUP BY vs.kundenID, vs.kunde, kt.bezeichnung
+            ORDER BY {order_col} DESC
+        """
+    else:  # kundentyp
+        sql = """
+            SELECT
+                kt.kundentypID       AS id,
+                COALESCE(kt.bezeichnung,'Standard') AS name,
+                COALESCE(kt.bezeichnung,'Standard') AS typ,
+                ROUND(SUM(vs.umsatz),2) AS umsatz,
+                ROUND(SUM(vs.marge),2)  AS marge
+            FROM v_sales vs
+            JOIN kunden k   ON k.kundenID = vs.kundenID
+            LEFT JOIN kundentyp kt ON kt.kundentypID = k.kundentypID
+            WHERE vs.verkaufsdatum BETWEEN %s AND %s
+            GROUP BY kt.kundentypID, kt.bezeichnung
+            ORDER BY {order_col} DESC
+        """
+
+    order_col = "umsatz" if k == "umsatz" else "marge"
+    sql = sql.format(order_col=order_col)
 
     rows = []
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
             cur.execute(sql, (von, bis))
-            # Ergebnis ist Liste von Tupeln: (id, name, metric)
+            # (id, name, typ, umsatz, marge)
             rows = cur.fetchall()
         conn.close()
 
-    # Anteil je Zeile und kumulierten Anteil berechnen
-    total = float(sum(r[2] for r in rows)) or 1.0
-    data, cum, top80_count = [], 0.0, 0
-    for i, (rid, name, val) in enumerate(rows, start=1):
-        value = float(val)
-        share = (value / total) * 100.0
+    # --- Побудова структури для таблиці + Pareto ---
+    # сумарна величина для Pareto — це вибрана метрика k
+    total_metric = float(sum(r[3] if k == "umsatz" else r[4] for r in rows)) or 1.0
+
+    data = []
+    cum = 0.0
+    top80_count = 0
+
+    for i, (rid, name, typ, umsatz, marge) in enumerate(rows, start=1):
+        value = float(umsatz if k == "umsatz" else marge)
+        share = (value / total_metric) * 100.0
         cum += share
-        d = {
-            "rank": i,                 # Rangplatz
-            "id": rid,                 # Primärschlüssel
-            "name": name,              # Anzeigename
-            "value": round(value, 2),  # Wert (Umsatz oder Marge)
-            "share": round(share, 2),  # Anteil in %
-            "cum_share": round(cum, 2),# kumulativer Anteil in %
-            "in80": cum <= 80.0        # True, solange kumulativ ≤ 80 %
+        rec = {
+            "rank": i,
+            "id": rid,
+            "name": name,
+            "typ": typ,                     # може бути None для artikel
+            "umsatz": float(umsatz or 0.0),
+            "marge":  float(marge  or 0.0),
+            "value":  round(value, 2),      # значення обраної метрики
+            "share":  round(share, 2),
+            "cum_share": round(cum, 2),
+            "in80": cum <= 80.0
         }
-        data.append(d)
-        if d["in80"]:
-            top80_count = i  # wie viele Einträge bilden die 80 %
+        data.append(rec)
+        if rec["in80"]:
+            top80_count = i
 
-    total_items = len(data)
-    top80_pct = round((top80_count / total_items) * 100, 1) if total_items else 0.0
+    # підсумки (для футера таблиці)
+    sums = {
+        "umsatz": round(sum(d["umsatz"] for d in data), 2),
+        "marge":  round(sum(d["marge"]  for d in data), 2),
+    }
 
-    # Für das Chart nur die ersten 25 Einträge (besser lesbar)
-    chart_labels   = [d["name"] for d in data[:25]]
-    chart_bars     = [d["value"] for d in data[:25]]
-    chart_cum_line = [d["cum_share"] for d in data[:25]]
+    # дані для графіка (беремо перші 30 — читабельніше)
+    chart_labels   = [d["name"] for d in data[:30]]
+    chart_bars     = [d["value"] for d in data[:30]]        # обрана метрика
+    chart_cum_line = [d["cum_share"] for d in data[:30]]    # кумулятивний %
+
+    top80_pct = round((top80_count / (len(data) or 1)) * 100, 1)
 
     return render_template(
         "reports_pareto.html",
         title=page_title,
         by=by, von=von, bis=bis,
-        k=k,                       # gewählte Kennzahl (umsatz/marge)
-        metric_label=metric_label, # Text in Legende/Überschrift
-        total=round(total, 2),
-        top80_count=top80_count,
-        top80_pct=top80_pct,
-        rows=data,                 # Tabelle
-        chart_labels=chart_labels, # X-Achse der Balken
-        chart_bars=chart_bars,     # Werte (Balken)
-        chart_cum_line=chart_cum_line, # kumulative % (Linie)
+        k=k, metric_label=metric_label,
+        total=round(total_metric, 2),     # сума вибраної метрики (для інфо-плашки)
+        sums=sums,                        # підсумки для футера
+        top80_count=top80_count, top80_pct=top80_pct,
+        rows=data,
+        chart_labels=chart_labels,
+        chart_bars=chart_bars,
+        chart_cum_line=chart_cum_line,
     )

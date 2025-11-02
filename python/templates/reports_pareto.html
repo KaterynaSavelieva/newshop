@@ -1,10 +1,23 @@
+{# ───────────────────────────────────────────────────────────
+   reports_pareto.html – Pareto 80/20
+   Neu:
+   • Modus „Kundentyp“
+   • In der Kundentabelle zusätzliche Spalte „Typ“
+   • Immer beide Werte in der Tabelle: Umsatz (€) und Marge (€)
+   • Summen (Fußzeile)
+   • Schöne Zahlen via |thousands
+   ─────────────────────────────────────────────────────────── #}
+
 {% extends "base.html" %}
 {% block title %}Pareto 80/20{% endblock %}
 {% block content %}
 
+<!--  Überschrift -->
 <h3 class="mb-3">Pareto 80/20</h3>
 
+<!-- Filterleiste oben -->
 <form class="row g-2 mb-3" method="get">
+  <!-- Zeitraum von/bis -->
   <div class="col-auto">
     <label class="form-label" for="von">Von</label>
     <input id="von" type="date" name="von" class="form-control" value="{{ von }}">
@@ -15,14 +28,17 @@
     <input id="bis" type="date" name="bis" class="form-control" value="{{ bis }}">
   </div>
 
+  <!-- Modus: nach welcher Dimension gruppieren -->
   <div class="col-auto">
     <label class="form-label" for="by">Modus</label>
     <select id="by" name="by" class="form-select">
-      <option value="artikel" {% if by=='artikel' %}selected{% endif %}>Artikel</option>
-      <option value="kunde"   {% if by=='kunde'   %}selected{% endif %}>Kunde</option>
+      <option value="artikel"   {% if by=='artikel'   %}selected{% endif %}>Artikel</option>
+      <option value="kunde"     {% if by=='kunde'     %}selected{% endif %}>Kunde</option>
+      <option value="kundentyp" {% if by=='kundentyp' %}selected{% endif %}>Kundentyp</option>
     </select>
   </div>
 
+  <!-- Kriterium: welche Kennzahl zeichnet die Balken (für Diagramm) -->
   <div class="col-auto">
     <label class="form-label" for="k">Kriterium</label>
     <select id="k" name="k" class="form-select">
@@ -31,20 +47,27 @@
     </select>
   </div>
 
+  <!-- Button -->
   <div class="col-auto align-self-end">
     <button class="btn btn-primary">Anzeigen</button>
   </div>
 </form>
 
+<!--  Infozeile mit Gesamt und Top-80%-Angaben -->
 <div class="alert alert-info py-2">
-  Gesamt<strong>{{ ' ' + metric_label }}</strong>: <b>{{ '%.2f'|format(total) }}</b>.
-  Top-80% erreichen <b>{{ top80_count }}</b>
-  {{ 'Kunden' if by=='kunde' else 'Artikel' }}
-  (<b>{{ '%.1f'|format(top80_pct) }}%</b>).
+  <!-- einfache Sprache: „Gesamt {Kennzahl}: …“ -->
+  Gesamt<strong>{{ ' ' + metric_label }}</strong>:
+  <b>{{ total | thousands }}</b>.
+  Top&nbsp;80% erreichen <b>{{ top80_count }}</b>
+  {% if by=='kunde' %}Kunden{% elif by=='kundentyp' %}Kundentypen{% else %}Artikel{% endif %}
+  (<b>{{ top80_pct | thousands(1) }}%</b>).
 </div>
 
+<!-- Pareto-Diagramm: Balken = Kennzahl, Linie = kumulativ % -->
 <div class="card mb-3">
-  <div class="card-header py-2">Pareto-Diagramm (Balken = {{ metric_label }}, Linie = kum. %)</div>
+  <div class="card-header py-2">
+    Pareto-Diagramm (Balken = {{ metric_label }}, Linie = kum. %)
+  </div>
   <div class="card-body">
     <div id="paretoContainer" style="position:relative; width:100%; height:460px;">
       <canvas id="paretoChart"></canvas>
@@ -52,31 +75,53 @@
   </div>
 </div>
 
+<!--  Tabelle
+       • links Rang und Name
+       • bei Kunden zusätzlich Spalte „Typ“
+       • zwei Geldspalten: Umsatz und Marge
+       • zwei Prozentspalten: Anteil und Kumulativ
+       • am Ende Badge, ob Eintrag innerhalb der 80% liegt
+-->
 <div class="card">
-  <div class="card-header py-2">Tabelle (nach {{ metric_label }} absteigend)</div>
+  <div class="card-header py-2">
+    Tabelle (nach {{ metric_label }} absteigend)
+  </div>
+
   <div class="table-responsive">
     <table class="table table-sm table-striped table-bordered mb-0 align-middle">
       <thead class="table-light">
         <tr>
-          <th>#</th>
-          <th>{{ 'Kunde' if by=='kunde' else 'Artikel' }}</th>
-          <th class="text-end">{{ metric_label }}</th>
+          <th style="width:56px;">#</th>
+          <th>
+            {% if by=='kunde' %}Kunde{% elif by=='kundentyp' %}Kundentyp{% else %}Artikel{% endif %}
+          </th>
+          {% if by=='kunde' %}
+            <th>Typ</th>  {# nur für Kunden anzeigen #}
+          {% endif %}
+          <th class="text-end">Umsatz (€)</th>
+          <th class="text-end">Marge (€)</th>
           <th class="text-end">Anteil (%)</th>
           <th class="text-end">Kumulativ (%)</th>
-          <th>Top 80%</th>
+          <th class="text-center">Top&nbsp;80%</th>
         </tr>
       </thead>
+
       <tbody>
         {% for r in rows %}
         <tr>
           <td>{{ r.rank }}</td>
           <td>{{ r.name }}</td>
-          <td class="text-end">{{ '%.2f'|format(r.value) }}</td>
-          <td class="text-end">{{ '%.2f'|format(r.share) }}</td>
-          <td class="text-end">{{ '%.2f'|format(r.cum_share) }}</td>
-          <td>
+          {% if by=='kunde' %}
+            <td>{{ r.typ or '–' }}</td>
+          {% endif %}
+          <!-- schöne Geldformate mit deinem Filter `thousands` -->
+          <td class="text-end">{{ r.umsatz | thousands }}</td>
+          <td class="text-end">{{ r.marge  | thousands }}</td>
+          <td class="text-end">{{ r.share      | thousands(2) }}</td>
+          <td class="text-end">{{ r.cum_share  | thousands(2) }}</td>
+          <td class="text-center">
             {% if r.in80 %}
-              <span class="badge bg-success">✓</span>
+              <span class="badge bg-success">✔</span>
             {% else %}
               <span class="badge bg-secondary">–</span>
             {% endif %}
@@ -84,29 +129,48 @@
         </tr>
         {% endfor %}
       </tbody>
+
+      <!--  Fußzeile mit Summen (Umsatz/Marge) und 100%-Spalten -->
+      <tfoot class="table-light">
+        <tr>
+          <!-- colspan hängt davon ab, ob die Spalte „Typ“ sichtbar ist -->
+          <th colspan="{% if by=='kunde' %}3{% else %}2{% endif %}">Summe</th>
+          <th class="text-end">{{ sums.umsatz | thousands }}</th>
+          <th class="text-end">{{ sums.marge  | thousands }}</th>
+          <th class="text-end">100,00</th>
+          <th class="text-end">100,00</th>
+          <th></th>
+        </tr>
+      </tfoot>
     </table>
   </div>
 </div>
 
-<!-- Chart.js + плагін підписів -->
+<!-- Chart.js + Plugin für Datenlabels (für drehbare Namen auf Balken) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
 <script>
+  // ─────────────────────────────────────────────
+  // Daten aus Flask (für das Diagramm)
+  // ─────────────────────────────────────────────
   const labels  = {{ chart_labels   | tojson | safe }};
   const barsRaw = {{ chart_bars     | tojson | safe }};
   const cumRaw  = {{ chart_cum_line | tojson | safe }};
   const metricLabel = {{ metric_label|tojson|safe }};
 
+  // Sicher in Zahlen wandeln (leere → 0)
   const bars    = Array.isArray(barsRaw) ? barsRaw.map(v => Number(v) || 0) : [];
   const cumLine = Array.isArray(cumRaw)  ? cumRaw.map(v => Number(v) || 0)  : [];
 
+  // Diagramm aufbauen
   function buildPareto() {
     try {
       if (typeof Chart === 'undefined') return;
       const cvs = document.getElementById('paretoChart');
       if (!cvs || !labels.length) return;
 
+      // altes Chart zerstören (Vermeidung von Doppel-Canvas)
       if (window.paretoChart && typeof window.paretoChart.destroy === 'function') {
         window.paretoChart.destroy();
       }
@@ -120,6 +184,7 @@
           labels,
           datasets: [
             {
+              // Balken: ausgewählte Kennzahl (Umsatz oder Marge)
               type: 'bar',
               label: metricLabel,
               data: bars,
@@ -127,6 +192,7 @@
               backgroundColor: 'rgba(54, 162, 235, 0.45)',
               borderColor: 'rgba(54, 162, 235, 1)',
               borderWidth: 1,
+              // Names als drehbare Labels direkt auf den Balken
               datalabels: {
                 color: '#0b2239',
                 font: { size: 14, weight: 'normal' },
@@ -140,6 +206,7 @@
               }
             },
             {
+              // Linie: kumulativer Anteil in %
               type: 'line',
               label: 'Kumulativ (%)',
               data: cumLine,
@@ -158,9 +225,12 @@
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           scales: {
+            // linke Y-Achse: Geld (Umsatz oder Marge)
             y:  { title: { display: true, text: metricLabel }, beginAtZero: true },
+            // rechte Y-Achse: Prozent (0..100)
             y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
                   grid: { drawOnChartArea: false } },
+            // X-Achse: Kategorienamen verstecken (wir zeigen sie als DataLabels)
             x:  { ticks: { display: false } }
           },
           plugins: {
@@ -176,10 +246,11 @@
     }
   }
 
+  // beim Laden/Resize neu aufbauen
   (document.readyState === 'loading')
     ? document.addEventListener('DOMContentLoaded', buildPareto)
     : buildPareto();
-  window.addEventListener('load', () => setTimeout(buildPareto, 0));
+  window.addEventListener('load',   () => setTimeout(buildPareto, 0));
   window.addEventListener('resize', () => setTimeout(buildPareto, 100));
 </script>
 
