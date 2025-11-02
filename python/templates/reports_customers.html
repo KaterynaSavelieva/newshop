@@ -196,9 +196,9 @@
 
   // Daten aus Python in JS-Listen umwandeln
   const labels    = {{ rows|map(attribute=1)|list|tojson }};  // Kundennamen
-  const umsatz    = {{ rows|map(attribute=4)|list|tojson }};  // Umsatz €
-  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};  // Marge €
-  const margePct  = {{ rows|map(attribute=7)|list|tojson }};  // Marge %
+  const umsatz    = {{ rows|map(attribute=5)|list|tojson }};  // Umsatz €
+  const margeEuro = {{ rows|map(attribute=7)|list|tojson }};  // Marge €
+  const margePct  = {{ rows|map(attribute=8)|list|tojson }};  // Marge %
 
   // Diagramm erstellen
   new Chart(document.getElementById('custChart'), {
