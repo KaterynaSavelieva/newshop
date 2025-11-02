@@ -151,6 +151,15 @@ def report_customers():
     # Zeitraum: Standard letzte 30 Tage
     von, bis = f_get_period(30)
 
+    # Wenn der Benutzer aus "Umsatz pro Artikel" kommt:
+    artikel_param = request.args.get("artikel")
+    if artikel_param:
+        # Filter für diesen Artikel aktivieren
+        artikel_sel = [artikel_param]
+    else:
+        artikel_sel = []
+
+
     # Filter-IDs (Mehrfachauswahl)
     kunden_sel, artikel_sel, kundentyp_sel = f_get_filters()
 

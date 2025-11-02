@@ -20,7 +20,7 @@ def fetch_low_stock(cur):
     cur.execute("""
         SELECT artikelID, produktname, lagerbestand
         FROM artikel
-        WHERE lagerbestand < 3000;
+        WHERE lagerbestand < 4000;
     """)
     return cur.fetchall()
 
@@ -78,7 +78,7 @@ def main():
             # 1️ Artikel mit niedrigem Lagerbestand holen
             low = fetch_low_stock(cur)
             if not low:
-                print(" Keine Artikel mit Lagerbestand < 3000. Kein Einkauf nötig.")
+                print(" Keine Artikel mit Lagerbestand < 4000. Kein Einkauf nötig.")
                 return
 
             # 2️ Plan für Einkäufe vorbereiten
@@ -94,7 +94,7 @@ def main():
                 lieferant_id, preis = sup
 
                 # zufällige Menge zwischen 200 und 4000 Stück
-                menge = random.randint(200, 4000)
+                menge = random.randint(200, 7000)
 
                 plan.setdefault(lieferant_id, []).append((artikel_id, menge, preis))
 
