@@ -1,586 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Umsatz pro Tag{% endblock %}
+{% block content %}
 
+<style>
+    .chart-wrap {
+        position: relative;
+        width: 100%;
+        max-width: 1100px;
+        height: 380px;
+        margin: 0 auto;
+    }
 
-<!doctype html>
-<html lang="de">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pareto 80/20 – Umsatz pro Artikel</title>
+    .filters .form-select[multiple] {
+        height: 220px;
+    }
 
-    <!-- Bootstrap 5 -->
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    .filters .card {
+        min-height: 270px;
+    }
 
-    <style>
-        body { background: #f8f9fb; }
-        .navbar { background: #fff; border-bottom: 1px solid #e9ecef; }
-        .container { max-width: 1280px; }
-        .card { border-radius: 14px; }
-        .table thead th { white-space: nowrap; }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg sticky-top">
-      <div class="container">
-        <!-- Клік по бренду → головна з картинкою -->
-        <a class="navbar-brand fw-semibold" href="/">NewShop</a>
+    .meta-line {
+        font-size: .95rem;
+    }
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
-          <span class="navbar-toggler-icon"></span>
-        </button>
+    .action-bar {
+        position: sticky;
+        top: 8px;
+        z-index: 2;
+    }
+</style>
 
-        <div class="collapse navbar-collapse" id="nav">
-          <ul class="navbar-nav me-auto">
-            <!-- Клік по Dashboard → таблиця продажів -->
-            <li class="nav-item">
-              <a class="nav-link "
-                 href="/dashboard">Dashboard</a>
-            </li>
+<div class="d-flex align-items-center justify-content-between mb-2">
+    <h3 class="mb-0">Umsatz pro Tag</h3>
+</div>
 
-            <li class="nav-item">
-              <a class="nav-link "
-                 href="/reports/daily">Umsatz pro Tag</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link "
-                 href="/reports/customers">Umsatz pro Kunde</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link "
-                 href="/reports/articles">Umsatz pro Artikel</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link "
-                 href="/reports/stock_low">Lagerwarnung</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link "
-                 href="/reports/turnover">Umschlag 90 Tag</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link active"
-                href="/reports/pareto">Pareto 80/20</a>
-            </li>
-
-          </ul>
-
-
-            <span class="text-muted small me-3">Admin</span>
-            <a class="btn btn-outline-secondary btn-sm" href="/logout">Abmelden</a>
-
+<form class="filters" method="get" action="{{ url_for('reports.report_daily') }}">
+    <div class="row g-3 mb-3">
+        <!-- Дати -->
+        <div class="col-md-3">
+            <label class="form-label">Von:</label>
+            <input type="date" name="von" value="{{ von }}" class="form-control">
         </div>
-      </div>
-    </nav>
+        <div class="col-md-3">
+            <label class="form-label">Bis:</label>
+            <input type="date" name="bis" value="{{ bis }}" class="form-control">
+        </div>
 
+        <!-- Інтервал -->
+        <div class="col-md-4">
+            <label class="form-label d-block">Intervall</label>
+            <div class="btn-group" role="group">
+                <input class="btn-check" type="radio" name="grp" id="g1" value="day" {{ 'checked' if grp == 'day' else '' }}>
+                <label class="btn btn-outline-primary" for="g1">Tag</label>
 
+                <input class="btn-check" type="radio" name="grp" id="g2" value="month" {{ 'checked' if grp == 'month' else '' }}>
+                <label class="btn btn-outline-primary" for="g2">Monat</label>
 
+                <input class="btn-check" type="radio" name="grp" id="g3" value="year" {{ 'checked' if grp == 'year' else '' }}>
+                <label class="btn btn-outline-primary" for="g3">Jahr</label>
+            </div>
+        </div>
 
-    <main class="container py-4">
+        <!-- Кнопки -->
+        <div class="col-md-2 d-flex align-items-end justify-content-end gap-2 action-bar">
+            <button class="btn btn-primary" type="submit">Filtern</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_daily') }}">Zurücksetzen</a>
+        </div>
+    </div>
 
+    <div class="row g-3">
+        <!-- Клієнти -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2">Kunde(n)</div>
+                <div class="card-body">
+                    <select name="kunden" class="form-select" multiple>
+                        {% for id, name in kunden_list %}
+                        <option value="{{ id }}" {% if kunden_sel and (id|string) in kunden_sel %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+                </div>
+            </div>
+        </div>
 
+        <!-- Типи клієнтів -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2">Kundentyp</div>
+                <div class="card-body">
+                    <select name="kundentypen" class="form-select" multiple>
+                        {% for id, name in kundentyp_list %}
+                        <option value="{{ id }}" {% if kundentyp_sel and (id|string) in kundentyp_sel %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+                </div>
+            </div>
+        </div>
 
+        <!-- Артикулі -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2">Artikel</div>
+                <div class="card-body">
+                    <select name="artikel" class="form-select" multiple>
+                        {% for id, name in artikel_list %}
+                        <option value="{{ id }}" {% if artikel_sel and (id|string) in artikel_sel %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Mehrfachauswahl mit Strg/Cmd oder Shift.</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-
-<h3 class="mb-3">Pareto 80/20</h3>
-
-<form class="row g-2 mb-3" method="get">
-  <div class="col-auto">
-    <label class="form-label" for="von">Von</label>
-    <input id="von" type="date" name="von" class="form-control" value="2025-08-01">
-  </div>
-
-  <div class="col-auto">
-    <label class="form-label" for="bis">Bis</label>
-    <input id="bis" type="date" name="bis" class="form-control" value="2025-10-30">
-  </div>
-
-  <div class="col-auto">
-    <label class="form-label" for="by">Modus</label>
-    <select id="by" name="by" class="form-select">
-      <option value="artikel" selected>Artikel</option>
-      <option value="kunde"   >Kunde</option>
-    </select>
-  </div>
-
-  <div class="col-auto align-self-end">
-    <button class="btn btn-primary">Anzeigen</button>
-  </div>
 </form>
 
-<div class="alert alert-info py-2">
-  Gesamtumsatz: <b>177205.80 €</b>.
-  Top-80% erreichen <b>17</b> Artikel.
+{# Рядок “що відфільтровано” з конкретними назвами #}
+{% set pills = [] %}
+{% if von %}{% set _ = pills.append('von: ' ~ von) %}{% endif %}
+{% if bis %}{% set _ = pills.append('bis: ' ~ bis) %}{% endif %}
+{% if grp %}{% set _ = pills.append('Intervall: ' ~ grp) %}{% endif %}
+
+{# показати конкретні імена, якщо мало вибрано #}
+{% if kunden_sel and kunden_sel|length > 0 %}
+  {% set names = [] %}
+  {% for id, name in kunden_list %}
+    {% if (id|string) in kunden_sel %}{% set _ = names.append(name) %}{% endif %}
+  {% endfor %}
+  {% set _ = pills.append('Kunde: ' ~ (names|join(', '))) %}
+{% endif %}
+
+{% if kundentyp_sel and kundentyp_sel|length > 0 %}
+  {% set names = [] %}
+  {% for id, name in kundentyp_list %}
+    {% if (id|string) in kundentyp_sel %}{% set _ = names.append(name) %}{% endif %}
+  {% endfor %}
+  {% set _ = pills.append('Kundentyp: ' ~ (names|join(', '))) %}
+{% endif %}
+
+{% if artikel_sel and artikel_sel|length > 0 %}
+  {% set names = [] %}
+  {% for id, name in artikel_list %}
+    {% if (id|string) in artikel_sel %}{% set _ = names.append(name) %}{% endif %}
+  {% endfor %}
+  {% set _ = pills.append('Artikel: ' ~ (names|join(', '))) %}
+{% endif %}
+
+{% if pills %}
+<div class="alert alert-light border meta-line py-2 mt-3">
+    Gefiltert:
+    {% for p in pills %}
+    <span class="badge bg-secondary me-1">{{ p }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Графік: Umsatz (€) — бар, Marge (€) — бар, Marge (%) — лінія -->
+<div class="card mt-3">
+    <div class="card-header py-2">Umsatz – Diagramm (€/{{ 'day' if grp=='day' else ( 'month' if grp=='month' else ( 'year' if grp=='year' else 'day' ) ) }}) &amp; Marge (%)</div>
+    <div class="card-body">
+        <div class="chart-wrap">
+            <canvas id="dailyChart"></canvas>
+        </div>
+    </div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header py-2">Pareto-Diagramm (Balken = Umsatz, Linie = kum. %)</div>
-  <div class="card-body" style="min-height:420px">
-    <canvas id="paretoChart" height="420"></canvas>
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-header py-2">Tabelle (nach Umsatz absteigend)</div>
-  <div class="table-responsive">
-    <table class="table table-sm table-striped table-bordered mb-0 align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>#</th>
-          <th>Artikel</th>
-          <th class="text-end">Umsatz (€)</th>
-          <th class="text-end">Anteil (%)</th>
-          <th class="text-end">Kumulativ (%)</th>
-          <th>Top 80%</th>
-        </tr>
-      </thead>
-      <tbody>
-
-        <tr>
-          <td>1</td>
-          <td>Wein</td>
-          <td class="text-end">15442.02</td>
-          <td class="text-end">8.71</td>
-          <td class="text-end">8.71</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>2</td>
-          <td>Kaffee</td>
-          <td class="text-end">12762.05</td>
-          <td class="text-end">7.20</td>
-          <td class="text-end">15.92</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>3</td>
-          <td>Tee</td>
-          <td class="text-end">10410.95</td>
-          <td class="text-end">5.88</td>
-          <td class="text-end">21.79</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>4</td>
-          <td>Öl</td>
-          <td class="text-end">9301.97</td>
-          <td class="text-end">5.25</td>
-          <td class="text-end">27.04</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>5</td>
-          <td>Schokolade</td>
-          <td class="text-end">9031.48</td>
-          <td class="text-end">5.10</td>
-          <td class="text-end">32.14</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>6</td>
-          <td>Bier</td>
-          <td class="text-end">8519.13</td>
-          <td class="text-end">4.81</td>
-          <td class="text-end">36.94</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>7</td>
-          <td>Käse</td>
-          <td class="text-end">7701.40</td>
-          <td class="text-end">4.35</td>
-          <td class="text-end">41.29</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>8</td>
-          <td>Saft</td>
-          <td class="text-end">7638.59</td>
-          <td class="text-end">4.31</td>
-          <td class="text-end">45.60</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>9</td>
-          <td>Ketchup</td>
-          <td class="text-end">7450.01</td>
-          <td class="text-end">4.20</td>
-          <td class="text-end">49.81</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>10</td>
-          <td>Essig</td>
-          <td class="text-end">7162.75</td>
-          <td class="text-end">4.04</td>
-          <td class="text-end">53.85</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>11</td>
-          <td>Kekse</td>
-          <td class="text-end">7143.96</td>
-          <td class="text-end">4.03</td>
-          <td class="text-end">57.88</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>12</td>
-          <td>Chips</td>
-          <td class="text-end">6082.20</td>
-          <td class="text-end">3.43</td>
-          <td class="text-end">61.31</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>13</td>
-          <td>Butter</td>
-          <td class="text-end">5998.51</td>
-          <td class="text-end">3.39</td>
-          <td class="text-end">64.70</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>14</td>
-          <td>Tomaten</td>
-          <td class="text-end">5924.67</td>
-          <td class="text-end">3.34</td>
-          <td class="text-end">68.04</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>15</td>
-          <td>Nudeln</td>
-          <td class="text-end">5820.43</td>
-          <td class="text-end">3.28</td>
-          <td class="text-end">71.32</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>16</td>
-          <td>Reis</td>
-          <td class="text-end">5526.10</td>
-          <td class="text-end">3.12</td>
-          <td class="text-end">74.44</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>17</td>
-          <td>Senf</td>
-          <td class="text-end">5323.07</td>
-          <td class="text-end">3.00</td>
-          <td class="text-end">77.45</td>
-          <td>
-
-              <span class="badge bg-success">✓</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>18</td>
-          <td>Gurken</td>
-          <td class="text-end">5002.75</td>
-          <td class="text-end">2.82</td>
-          <td class="text-end">80.27</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>19</td>
-          <td>Brot</td>
-          <td class="text-end">4985.48</td>
-          <td class="text-end">2.81</td>
-          <td class="text-end">83.08</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>20</td>
-          <td>Pfeffer</td>
-          <td class="text-end">4020.30</td>
-          <td class="text-end">2.27</td>
-          <td class="text-end">85.35</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>21</td>
-          <td>Joghurt</td>
-          <td class="text-end">3783.53</td>
-          <td class="text-end">2.14</td>
-          <td class="text-end">87.49</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>22</td>
-          <td>Zucker</td>
-          <td class="text-end">3586.43</td>
-          <td class="text-end">2.02</td>
-          <td class="text-end">89.51</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>23</td>
-          <td>Zwiebeln</td>
-          <td class="text-end">3451.31</td>
-          <td class="text-end">1.95</td>
-          <td class="text-end">91.46</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>24</td>
-          <td>Milch</td>
-          <td class="text-end">3340.91</td>
-          <td class="text-end">1.89</td>
-          <td class="text-end">93.34</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>25</td>
-          <td>Mehl</td>
-          <td class="text-end">2767.20</td>
-          <td class="text-end">1.56</td>
-          <td class="text-end">94.91</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>26</td>
-          <td>Apfel</td>
-          <td class="text-end">2365.06</td>
-          <td class="text-end">1.33</td>
-          <td class="text-end">96.24</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>27</td>
-          <td>Salz</td>
-          <td class="text-end">2335.97</td>
-          <td class="text-end">1.32</td>
-          <td class="text-end">97.56</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>28</td>
-          <td>Kartoffeln</td>
-          <td class="text-end">1832.41</td>
-          <td class="text-end">1.03</td>
-          <td class="text-end">98.59</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>29</td>
-          <td>Wasser</td>
-          <td class="text-end">1400.59</td>
-          <td class="text-end">0.79</td>
-          <td class="text-end">99.38</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-        <tr>
-          <td>30</td>
-          <td>Eier</td>
-          <td class="text-end">1094.57</td>
-          <td class="text-end">0.62</td>
-          <td class="text-end">100.00</td>
-          <td>
-
-              <span class="badge bg-secondary">–</span>
-
-          </td>
-        </tr>
-
-      </tbody>
+<!-- Таблиця -->
+<div class="table-responsive mt-3">
+    <table class="table table-sm table-striped table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Tag/Label</th>
+                <th>Positionen</th>
+                <th>Menge</th>
+                <th>Rabatt (€)</th>
+                <th>Umsatz (€)</th>
+                <th>Kosten (€)</th>
+                <th>Marge (€)</th>
+                <th>Umsatz brutto (€)</th>
+                <th>Marge brutto (€)</th>
+                <th>Marge (%)</th>
+                <th>Marge brutto (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td>{{ r[0] }}</td>
+                <td>{{ r[1] }}</td>
+                <td>{{ '%.0f'|format(r[2]) }}</td>
+                <td>{{ '%.2f'|format(r[3]) }}</td>
+                <td>{{ '%.2f'|format(r[4]) }}</td>
+                <td>{{ '%.2f'|format(r[5]) }}</td>
+                <td>{{ '%.2f'|format(r[6]) }}</td>
+                <td>{{ '%.2f'|format(r[7]) }}</td>
+                <td>{{ '%.2f'|format(r[8]) }}</td>
+                <td>{{ '%.2f'|format(r[9]) }}</td>
+                <td>{{ '%.2f'|format(r[10]) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+            <tr>
+                <th>Summe</th>
+                <th>{{ totals.positionen }}</th>
+                <th>{{ '%.0f'|format(totals.menge) }}</th>
+                <th>{{ '%.2f'|format(totals.rabatt_eur) }}</th>
+                <th>{{ '%.2f'|format(totals.umsatz) }}</th>
+                <th>{{ '%.2f'|format(totals.kosten) }}</th>
+                <th>{{ '%.2f'|format(totals.marge) }}</th>
+                <th>{{ '%.2f'|format(totals.umsatz_br) }}</th>
+                <th>{{ '%.2f'|format(totals.marge_br) }}</th>
+                {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
+                {% set marge_br_pct_total = (100.0 * totals.marge_br / (totals.umsatz_br if totals.umsatz_br != 0 else 1.0)) %}
+                <th>{{ '%.2f'|format(marge_pct_total) }}</th>
+                <th>{{ '%.2f'|format(marge_br_pct_total) }}</th>
+            </tr>
+        </tfoot>
     </table>
-  </div>
 </div>
 
 <script>
-  const labels  = ["Wein", "Kaffee", "Tee", "\u00d6l", "Schokolade", "Bier", "K\u00e4se", "Saft", "Ketchup", "Essig", "Kekse", "Chips", "Butter", "Tomaten", "Nudeln", "Reis", "Senf", "Gurken", "Brot", "Pfeffer", "Joghurt", "Zucker", "Zwiebeln", "Milch", "Mehl"];
-  const bars    = [15442.02, 12762.05, 10410.95, 9301.97, 9031.48, 8519.13, 7701.4, 7638.59, 7450.01, 7162.75, 7143.96, 6082.2, 5998.51, 5924.67, 5820.43, 5526.1, 5323.07, 5002.75, 4985.48, 4020.3, 3783.53, 3586.43, 3451.31, 3340.91, 2767.2].map(v => Number(v) || 0);
-  const cumLine = [8.71, 15.92, 21.79, 27.04, 32.14, 36.94, 41.29, 45.6, 49.81, 53.85, 57.88, 61.31, 64.7, 68.04, 71.32, 74.44, 77.45, 80.27, 83.08, 85.35, 87.49, 89.51, 91.46, 93.34, 94.91].map(v => Number(v) || 0);
+  // Дані для графіка
+  const labels    = {{ rows|map(attribute=0)|list|tojson }};
+  const umsatz    = {{ rows|map(attribute=4)|list|tojson }};  // €
+  const margeEuro = {{ rows|map(attribute=6)|list|tojson }};  // €
+  const margePct  = {{ rows|map(attribute=9)|list|tojson }};  // %
 
-  function buildPareto() {
-    if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
-    const cvs = document.getElementById('paretoChart');
-    if (!cvs) { console.error('canvas not found'); return; }
-    if (!labels?.length) { console.warn('no data for chart'); return; }
-
-    const ctx = cvs.getContext('2d');
-    if (window.paretoChart) window.paretoChart.destroy();
-
-    window.paretoChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { type: 'bar',  label: 'Umsatz (€)',    data: bars,    yAxisID: 'y'  },
-          { type: 'line', label: 'Kumulativ (%)', data: cumLine, yAxisID: 'y1', tension: 0.3, pointRadius: 2 }
-        ]
+  const ctx = document.getElementById('dailyChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { type:'bar',  label:'Umsatz (€)', data: umsatz,    yAxisID:'yEur', borderWidth:1 },
+        { type:'bar',  label:'Marge (€)',  data: margeEuro, yAxisID:'yEur', borderWidth:1 },
+        { type:'line', label:'Marge (%)',  data: margePct,  yAxisID:'yPct', borderWidth:2, fill:false, tension:0.25, pointRadius:2 }
+      ]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{
+        yEur:{ type:'linear', position:'left',  title:{display:true, text:'€'}, beginAtZero:true },
+        yPct:{ type:'linear', position:'right', title:{display:true, text:'%'}, beginAtZero:true, grid:{ drawOnChartArea:false } },
+        x:{ ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:14 } }
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          y:  { title: { display: true, text: 'Umsatz (€)' }, beginAtZero: true },
-          y1: { title: { display: true, text: 'Kumulativ (%)' }, min: 0, max: 100, position: 'right',
-                grid: { drawOnChartArea: false } },
-          x:  { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 15 } }
-        },
-        plugins: { legend: { display: true } }
-      }
-    });
-  }
-
-  (document.readyState === 'loading')
-    ? document.addEventListener('DOMContentLoaded', buildPareto)
-    : buildPareto();
-  window.addEventListener('load', () => setTimeout(buildPareto, 0));
+      plugins:{ legend:{ display:true } }
+    }
+  });
 </script>
 
-
-    </main>
-
-    <footer class="text-center text-muted py-3 small">© NewShop – Demo Dashboard</footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}
