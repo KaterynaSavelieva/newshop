@@ -145,6 +145,7 @@
       <tr>
         <th>#</th>
         <th>Kunde</th>
+        <th>Kundentyp</th>
         <th>Positionen</th>
         <th>Menge</th>
         <th>Umsatz (€)</th>
@@ -159,12 +160,13 @@
       <tr>
         <td>{{ loop.index }}</td>             {# Laufende Nummer #}
         <td>{{ r[1] }}</td>                   {# Kundenname #}
-        <td class="text-end">{{ r[2] | thousands(0)  }}</td>
-        <td class="text-end">{{ r[3] | thousands(0) }}</td>
-        <td class="text-end">{{ r[4] | thousands }}</td>
+        <td>{{ r[2] }}</td>                   {# Kundenname #}
+        <td class="text-end">{{ r[3] | thousands(0)  }}</td>
+        <td class="text-end">{{ r[4] | thousands(0) }}</td>
         <td class="text-end">{{ r[5] | thousands }}</td>
         <td class="text-end">{{ r[6] | thousands }}</td>
-        <td class="text-end">{{ r[7] | thousands(2) }} %</td>
+        <td class="text-end">{{ r[7] | thousands }}</td>
+        <td class="text-end">{{ r[8] | thousands(2) }} %</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -172,7 +174,7 @@
     <!-- Fußzeile mit Gesamtsumme -->
     <tfoot class="table-light">
       <tr>
-        <th colspan="2">Summe</th>
+        <th colspan="3">Summe</th>
         <th class="text-end">{{ totals.positionen | thousands(0) }}</th>
         <th class="text-end">{{ totals.menge | thousands(0) }}</th>
         <th class="text-end">{{ totals.umsatz | thousands }}</th>

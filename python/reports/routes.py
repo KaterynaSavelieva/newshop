@@ -159,7 +159,7 @@ def report_customers():
     if artikel_param:
         artikel_sel = [artikel_param]  # Artikel-Filter überschreiben
 
-    
+
     # Sicherstellen, dass top_n in sinnvollem Bereich bleibt
     try:
         top_n = int(request.args.get("top", "20"))
@@ -201,19 +201,21 @@ def report_customers():
             # Aggregation pro Kunde (absteigend nach Umsatz)
             sql = f"""
                 SELECT
-                  kundenID,
-                  kunde,
+                  vs.kundenID,
+                  vs.kunde,
+                  COALESCE(kt.bezeichnung, 'Standard') AS kundentyp,   -- 🆕 нове поле
                   COUNT(*)                            AS positionen,
-                  SUM(menge)                          AS menge,
-                  ROUND(SUM(umsatz), 2)               AS umsatz,
-                  ROUND(SUM(kosten), 2)               AS kosten,
-                  ROUND(SUM(umsatz) - SUM(kosten), 2) AS marge,
-                  ROUND(
-                    100 * (SUM(umsatz) - SUM(kosten)) / NULLIF(SUM(umsatz), 0), 2
-                  ) AS marge_prozent
-                FROM v_sales
+                  SUM(vs.menge)                       AS menge,
+                  ROUND(SUM(vs.umsatz), 2)            AS umsatz,
+                  ROUND(SUM(vs.kosten), 2)            AS kosten,
+                  ROUND(SUM(vs.umsatz) - SUM(vs.kosten), 2) AS marge,
+                  ROUND(100 * (SUM(vs.umsatz) - SUM(vs.kosten)) / NULLIF(SUM(vs.umsatz), 0), 2)
+                                                        AS marge_prozent
+                FROM v_sales vs
+                LEFT JOIN kunden k ON k.kundenID = vs.kundenID
+                LEFT JOIN kundentyp kt ON kt.kundentypID = k.kundentypID
                 WHERE {where_sql}
-                GROUP BY kundenID, kunde
+                GROUP BY vs.kundenID, vs.kunde, kt.bezeichnung
                 ORDER BY umsatz DESC
                 LIMIT {top_n}
             """
@@ -224,11 +226,11 @@ def report_customers():
     # Summen für Fußzeile
     if rows:
         totals = {
-            "positionen": sum(r[2] for r in rows),
-            "menge":      float(sum(r[3] for r in rows)),
-            "umsatz":     float(sum(r[4] for r in rows)),
-            "kosten":     float(sum(r[5] for r in rows)),
-            "marge":      float(sum(r[6] for r in rows)),
+            "positionen": sum(r[3] for r in rows),
+            "menge":      float(sum(r[4] for r in rows)),
+            "umsatz":     float(sum(r[5] for r in rows)),
+            "kosten":     float(sum(r[6] for r in rows)),
+            "marge":      float(sum(r[7] for r in rows)),
         }
     else:
         totals = {"positionen": 0, "menge": 0.0, "umsatz": 0.0, "kosten": 0.0, "marge": 0.0}
