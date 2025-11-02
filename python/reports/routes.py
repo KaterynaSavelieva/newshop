@@ -194,9 +194,14 @@ def report_customers():
             artikel_list = cur.fetchall()
 
             # WHERE und Parameter
-            where_sql, params = f_build_where_sql(
-                von, bis, kunden_sel, kundentyp_sel, artikel_sel
-            )
+            where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
+
+            where_sql = (where_sql
+                         .replace("verkaufsdatum", "vs.verkaufsdatum")
+                         .replace("kundenID", "vs.kundenID")  # фільтр за клієнтами беремо з vs
+                         .replace("artikelID", "vs.artikelID")  # фільтр за товарами – теж з vs
+                         .replace("kundentypID", "k.kundentypID")  # тип клієнта – з таблиці kunden
+                         )
 
             # Aggregation pro Kunde (absteigend nach Umsatz)
             sql = f"""
