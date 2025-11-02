@@ -1,170 +1,188 @@
-{# templates/base.html #}
-<!doctype html>
-<html lang="de">
+{# templates/base.html – Hauptvorlage für alle Seiten im Projekt #}
+<!doctype html> <!-- sagt dem Browser: moderne HTML5-Seite -->
+<html lang="de"> <!-- die Sprache der Seite ist Deutsch -->
 <head>
+    <!-- Zeichensatz: damit Umlaute (ä, ö, ü, ß) richtig angezeigt werden -->
     <meta charset="utf-8">
+
+    <!-- sorgt dafür, dass die Seite auf Handy, Tablet und PC gut aussieht -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Titel der Seite – steht oben im Browser-Tab -->
     <title>{{ title or "NewShop – Dashboard" }}</title>
 
-    <!-- Bootstrap 5 (CSS) -->
+    <!-- Bootstrap = fertiges Design-System mit Buttons, Tabellen, Layout usw. -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Chart.js für Diagramme -->
+    <!-- Chart.js = Bibliothek, um Diagramme anzuzeigen -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-    <!-- Favicon (optional, можна додати логотип магазину) -->
+    <!-- kleines Symbol (Icon) für die Browser-Registerkarte, optional -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
 
+    <!-- Eigene Farben und Stil (CSS) für das ganze Projekt -->
     <style>
-        /* 🩵 Grunddesign */
+        /* 🎨 Allgemeines Design der Seite */
         body {
-            background: #f8f9fb;
+            background: #f8f9fb;   /* hellgrauer Hintergrund für eine ruhige Optik */
             font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            /* obige Zeile bestimmt den Schriftstil – moderne, gut lesbare Schrift */
         }
 
-        /* 🔹 Navbar */
+        /* 🔹 obere Menüleiste (Navigation) */
         .navbar {
-            background: #ffffff;
-            border-bottom: 1px solid #e9ecef;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+            background: #ffffff; /* weißer Hintergrund */
+            border-bottom: 1px solid #e9ecef; /* dünne graue Linie unten */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04); /* leichter Schatten unten */
         }
 
-        /* 🔹 Container-Breite */
+        /* 🔹 legt die maximale Breite des Inhalts fest */
         .container { max-width: 1280px; }
 
-        /* 🔹 Karten (Boxen) */
+        /* 🔹 Boxen (Bootstrap-Komponente "Card") */
         .card {
-            border-radius: 14px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+            border-radius: 14px;   /* abgerundete Ecken für weiches Aussehen */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03); /* feiner Schatten */
         }
 
-        /* 🔹 Tabellen */
+        /* 🔹 Tabellenkopf – Bereich mit Spaltenüberschriften */
         .table thead th {
-            white-space: nowrap;
-            background-color: #f1f3f5;
+            white-space: nowrap; /* Text bleibt in einer Zeile (kein Zeilenumbruch) */
+            background-color: #f1f3f5; /* leicht grauer Hintergrund */
         }
 
+        /* 🔹 Tabellenzeilen beim Darüberfahren mit der Maus */
         .table-hover tbody tr:hover {
-            background-color: #f8f9fa;
+            background-color: #f8f9fa; /* leicht hellere Farbe */
         }
 
-        /* 🔹 Buttons */
+        /* 🔹 Stil des blauen Haupt-Buttons (Bootstrap-Klasse "btn-primary") */
         .btn-primary {
-            background-color: #0069d9;
-            border-color: #0062cc;
+            background-color: #0069d9; /* mittleres Blau */
+            border-color: #0062cc;     /* leicht dunklere Umrandung */
         }
 
-        /* 🔹 Aktiver Menüpunkt */
+        /* 🔹 Markierung für den aktiven Menüpunkt (zeigt, wo man gerade ist) */
         .nav-link.active {
-            font-weight: 600;
-            color: #0d6efd !important;
-            border-bottom: 2px solid #0d6efd;
+            font-weight: 600; /* etwas fetterer Text */
+            color: #0d6efd !important; /* kräftiges Blau */
+            border-bottom: 2px solid #0d6efd; /* blaue Linie unter dem aktiven Punkt */
         }
 
-        /* 🔹 Footer */
+        /* 🔹 Fußzeile (unten auf der Seite) */
         footer {
-            color: #6c757d;
-            background: #f8f9fa;
-            border-top: 1px solid #e9ecef;
+            color: #6c757d;        /* grauer Text */
+            background: #f8f9fa;   /* heller Hintergrund */
+            border-top: 1px solid #e9ecef; /* feine Linie über der Fußzeile */
         }
     </style>
 </head>
 
-
 <body>
-    <!-- Navigationsleiste oben (bleibt beim Scrollen sichtbar) -->
+    <!-- 🔝 OBERE NAVIGATION -->
+    <!-- "sticky-top" bedeutet: die Leiste bleibt oben, wenn man scrollt -->
     <nav class="navbar navbar-expand-lg sticky-top">
       <div class="container">
-        <!-- Klick auf die Marke → Startseite (Home mit Kachel/Übersicht) -->
+        <!-- Name/Logo des Projekts – Klick = Startseite -->
         <a class="navbar-brand fw-semibold" href="{{ url_for('dashboard.home') }}">NewShop</a>
 
-        <!-- Hamburger-Button für kleine Bildschirme -->
+        <!-- Menü-Knopf für kleine Bildschirme (Handy) -->
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
           <span class="navbar-toggler-icon"></span>
         </button>
 
-        <!-- Eingeklapptes Menü (mobil) / normale Leiste (Desktop) -->
+        <!-- der Bereich mit den Navigationslinks -->
         <div class="collapse navbar-collapse" id="nav">
           <ul class="navbar-nav me-auto">
-            <!-- Link „Dashboard“ → Tabelle der letzten Verkäufe -->
+            <!-- jeder Punkt in der Navigation ist ein <li> (Listeneintrag) -->
+
+            <!-- Link zum Dashboard (Tabelle der Verkäufe) -->
             <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'dashboard.table' %}active{% endif %}"
                  href="{{ url_for('dashboard.table') }}">Dashboard</a>
             </li>
 
-            <!-- Berichte: Tages-/Zeit-Ansicht -->
+            <!-- Link zum Bericht "Umsatz pro Tag" -->
             <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'reports.report_daily' %}active{% endif %}"
                  href="{{ url_for('reports.report_daily') }}">Umsatz pro Tag</a>
             </li>
 
-            <!-- Bericht: Top-Kunden -->
+            <!-- Bericht: Umsatz pro Kunde -->
             <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'reports.report_customers' %}active{% endif %}"
                  href="{{ url_for('reports.report_customers') }}">Umsatz pro Kunde</a>
             </li>
 
-            <!-- Bericht: Artikel (Top / Zeitreihe) -->
+            <!-- Bericht: Umsatz pro Artikel -->
             <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'reports.report_articles' %}active{% endif %}"
                  href="{{ url_for('reports.report_articles') }}">Umsatz pro Artikel</a>
             </li>
 
-            <!-- Bericht: Lagerwarnung (niedriger Bestand) -->
+            <!-- Bericht: Lagerwarnung (zeigt Artikel mit niedrigem Bestand) -->
             <li class="nav-item">
               <a class="nav-link {% if 'stock_low' in request.endpoint %}active{% endif %}"
                  href="{{ url_for('reports.report_stock_low') }}">Lagerwarnung</a>
             </li>
 
-            <!-- Bericht: Lagerumschlag 90 Tage -->
+            <!-- Bericht: Lagerumschlag (wie schnell Artikel verkauft werden) -->
             <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'reports.report_turnover' %}active{% endif %}"
                  href="{{ url_for('reports.report_turnover') }}">Umschlag 90 Tag</a>
             </li>
 
-            <!-- Bericht: Pareto-Analyse -->
+            <!-- Bericht: Pareto-Analyse (80/20-Regel) -->
             <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'reports.report_pareto' %}active{% endif %}"
-                href="{{ url_for('reports.report_pareto') }}">Pareto 80/20</a>
+                 href="{{ url_for('reports.report_pareto') }}">Pareto 80/20</a>
             </li>
           </ul>
 
-          <!-- Rechts: Login/Logout-Bereich -->
+          <!-- RECHTE SEITE DER NAVIGATION: Benutzerbereich -->
           {% if current_user.is_authenticated %}
-            <!-- Anzeigename oder E-Mail des eingeloggten Users -->
-            <span class="text-muted small me-3">{{ current_user.name or current_user.email }}</span>
-            <!-- Abmelden-Button -->
+            <!-- Wenn der Benutzer angemeldet ist: -->
+            <span class="text-muted small me-3">
+                {{ current_user.name or current_user.email }}
+                <!-- zeigt entweder Name oder E-Mail -->
+            </span>
+            <!-- Logout-Button -->
             <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('auth.logout') }}">Abmelden</a>
           {% else %}
-            <!-- Anmelden-Button (falls nicht eingeloggt) -->
+            <!-- Wenn kein Benutzer angemeldet ist: -->
             <a class="btn btn-primary btn-sm" href="{{ url_for('auth.login') }}">Anmelden</a>
           {% endif %}
         </div>
       </div>
     </nav>
 
-    <!-- Hauptbereich der Seite: hier werden Unterseiten eingesetzt -->
+    <!-- 🧱 HAUPTBEREICH DER SEITE -->
     <main class="container py-4">
-        <!-- Bootstrap-Alerts (Flash-Messages) anzeigen -->
+        <!-- Flash-Nachrichten (z. B. "Gespeichert", "Fehler", "Erfolgreich abgemeldet") -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for cat, msg in messages %}
+            <!-- Bootstrap-Alert = Nachrichtbox -->
             <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
-                {{ msg }}
+                {{ msg }} <!-- Text der Nachricht -->
+                <!-- kleine Schließen-Schaltfläche -->
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
           {% endfor %}
         {% endif %}
         {% endwith %}
 
-        <!-- Platzhalter für die jeweiligen Inhalte (Jinja-Block) -->
+        <!-- hier wird der Inhalt der Unterseite eingefügt -->
+        <!-- z. B. reports_daily.html oder reports_customers.html -->
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Kleiner Footer -->
-    <footer class="text-center text-muted py-3 small">© NewShop – Demo Dashboard</footer>
+    <!-- 👣 FUSSZEILE (unten auf jeder Seite) -->
+    <footer class="text-center text-muted py-3 small">
+        © NewShop – Demo Dashboard
+    </footer>
 
-    <!-- Bootstrap 5 JavaScript (für Navbar, Modals, Alerts, …) -->
+    <!-- Bootstrap JavaScript (für Menü, Buttons, Dropdowns, etc.) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
