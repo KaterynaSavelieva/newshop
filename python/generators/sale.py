@@ -1,11 +1,4 @@
 # sale.py
-"""
-Генерація ОДНОГО продажу з діапазонами, що залежать від типу клієнта:
-Standard →   menge 1–25,   max_items 1–50
-Silber   →   menge 1–50,   max_items 1–25
-Gold     →   menge 1–100,  max_items 1–100
-Platin   →   menge 1–150,  max_items 1–150
-"""
 
 import random
 from datetime import datetime

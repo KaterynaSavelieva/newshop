@@ -1,38 +1,56 @@
+{# ───────────────────────────────────────────────
+  reports_turnover.html
+  Lagerumschlag-Analyse der letzten 90 Tage
+  - Filter (Umschlag / Lagerdauer / Lagerwert)
+  - Bubble-Chart (Umschlag vs. Lagerdauer, Blasengröße = Lagerwert)
+  - Balken-Chart (Top 15 nach Lagerwert)
+  - Tabelle mit klickbarer Sortierung
+─────────────────────────────────────────────── #}
+
 {% extends "base.html" %}
 {% block title %}Umschlag 90 Tage{% endblock %}
 {% block content %}
 
 <style>
+  /*  Layout-Einstellungen */
   .chart-wrap { position: relative; width: 100%; max-width: 1100px; height: 420px; margin: 0 auto; }
-  .table thead th { cursor: pointer; }
-  .sticky-controls { position: sticky; top: 8px; z-index: 2; }
+  .table thead th { cursor: pointer; }           /* Hand-Cursor → zeigt: man kann klicken (sortieren) */
+  .sticky-controls { position: sticky; top: 8px; z-index: 2; } /* Button bleibt sichtbar beim Scrollen */
 </style>
 
+<!--  Überschrift -->
 <h3 class="mb-3">Umschlag 90 Tage</h3>
 
 <div class="row g-3">
+  <!-- Linke Spalte: Filter-Karte -->
   <div class="col-lg-3">
     <div class="card">
       <div class="card-header py-2">Filter</div>
       <div class="card-body">
+        <!-- Eingabe: minimaler Umschlag (wie oft der Bestand "dreht") -->
         <div class="mb-3">
           <label class="form-label">Min. Umschlag</label>
           <input id="fUmsMin" type="number" step="0.1" class="form-control" value="0">
         </div>
+        <!-- Eingabe: maximale Lagerdauer (in Tagen) -->
         <div class="mb-3">
           <label class="form-label">Max. Lagerdauer (Tage)</label>
           <input id="fLagMax" type="number" step="1" class="form-control" value="9999">
         </div>
+        <!-- Eingabe: minimaler Lagerwert (in Euro) -->
         <div class="mb-3">
           <label class="form-label">Min. Lagerwert (€)</label>
           <input id="fLagWMin" type="number" step="0.01" class="form-control" value="0">
         </div>
+        <!-- Button: Filter anwenden -->
         <button id="btnApply" class="btn btn-primary w-100 sticky-controls">Filtern</button>
       </div>
     </div>
   </div>
 
+  <!-- Rechte Spalte: Diagramme -->
   <div class="col-lg-9">
+    <!-- Bubble: Umschlag vs. Lagerdauer (Blasengröße = Lagerwert) -->
     <div class="card mb-3">
       <div class="card-header py-2">Umschlag vs. Lagerdauer (Bubble = Lagerwert)</div>
       <div class="card-body">
@@ -40,6 +58,7 @@
       </div>
     </div>
 
+    <!-- Balken: Top 15 nach Lagerwert -->
     <div class="card mb-3">
       <div class="card-header py-2">Top 15 nach Lagerwert</div>
       <div class="card-body">
@@ -49,22 +68,24 @@
   </div>
 </div>
 
+<!-- Tabelle mit klickbarer Sortierung -->
 <div class="card">
   <div class="card-header py-2">Tabelle (klickbare Sortierung)</div>
   <div class="card-body table-responsive">
     <table id="turnTable" class="table table-sm table-striped table-bordered align-middle">
       <thead class="table-light">
         <tr>
-          <th data-col="produktname">Artikel</th>
-          <th data-col="umschlag">Umschlag</th>
-          <th data-col="lagerdauer">Lagerdauer (T)</th>
-          <th data-col="lagerwert">Lagerwert (€)</th>
-          <th data-col="lagerbestand">Bestand</th>
-          <th data-col="vk90">Verkauf 90d (Menge)</th>
-          <th data-col="cogs90">COGS 90d (€)</th>
-          <th data-col="dkost">DK (€)</th>
-          <th data-col="ek_min">EK min</th>
-          <th data-col="ek_max">EK max</th>
+          {# data-col: Schlüssel im JS-Objekt → daran wird sortiert #}
+          <th data-col="artikel">Artikel</th>
+          <th data-col="umschlag" class="text-end">Umschlag</th>
+          <th data-col="lagerdauer" class="text-end">Lagerdauer (T)</th>
+          <th data-col="lagerwert" class="text-end">Lagerwert (€)</th>
+          <th data-col="bestand" class="text-end">Bestand</th>
+          <th data-col="vk90" class="text-end">Verkauf 90d (Menge)</th>
+          <th data-col="cogs90" class="text-end">COGS 90d (€)</th>
+          <th data-col="dkost" class="text-end">DK (€)</th>
+          <th data-col="ek_min" class="text-end">EK min</th>
+          <th data-col="ek_max" class="text-end">EK max</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -74,87 +95,116 @@
 </div>
 
 <script>
-  // Дані з бекенда
+  //  Daten aus dem Backend (Python → JSON)
+  // rows_json wurde im View bereits als JSON erzeugt (Liste von Dicts)
   const rows = {{ rows_json|safe }};
-  const nf = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
 
-  // ===== Фільтри =====
+  //  Schöne Zahlenformatierung (de-AT):
+  // - nf0: ganze Zahlen (z. B. 12 345)
+  // - nf2: zwei Nachkommastellen (z. B. 1 234,56)
+  const nf0 = new Intl.NumberFormat('de-AT', { maximumFractionDigits: 0 });
+  const nf2 = new Intl.NumberFormat('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  //  kleine Helfer zum Formatieren im Table:
+  const fmtInt   = v => nf0.format(v ?? 0);
+  const fmt2     = v => nf2.format(v ?? 0);
+  const fmtEuro  = v => nf2.format(v ?? 0); // ohne "€" im Table (Header hat schon "€")
+
+  // =====  Filter anwenden =====
   function applyFilters(data) {
     const minU  = parseFloat(document.getElementById('fUmsMin').value || 0);
     const maxL  = parseFloat(document.getElementById('fLagMax').value || 9999);
     const minLW = parseFloat(document.getElementById('fLagWMin').value || 0);
+
+    // Behalten nur Zeilen, die alle Bedingungen erfüllen
     return data.filter(d =>
-      d.umschlag   >= minU &&
-      d.lagerdauer <= maxL &&
-      d.lagerwert  >= minLW
+      (d.umschlag ?? 0)   >= minU &&
+      (d.lagerdauer ?? 0) <= maxL &&
+      (d.lagerwert ?? 0)  >= minLW
     );
   }
 
-  // ===== Сортування таблиці =====
-  let sortCol = null;    // 'artikel' | 'umschlag' | ...
-  let sortDir = 1;       // 1=ASC, -1=DESC
+  // =====  Sortierung (Tabelle) =====
+  let sortCol = null;  // z. B. 'umschlag'
+  let sortDir = 1;     // 1 = aufsteigend, -1 = absteigend
 
   function sortData(data) {
     if (!sortCol) return data;
-    return [...data].sort((a,b) => {
-      const va = a[sortCol], vb = b[sortCol];
-      if (typeof va === 'string') return va.localeCompare(vb,'de') * sortDir;
-      return (va - vb) * sortDir;
+    return [...data].sort((a, b) => {
+      const va = a[sortCol];
+      const vb = b[sortCol];
+      // Strings alphabetisch, Zahlen numerisch
+      if (typeof va === 'string' || typeof vb === 'string') {
+        return String(va ?? '').localeCompare(String(vb ?? ''), 'de') * sortDir;
+      }
+      return ((va ?? 0) - (vb ?? 0)) * sortDir;
     });
   }
+
   function attachSorting() {
+    // Klick auf Tabellenkopf startet Sortierung nach der Spalte
     document.querySelectorAll('#turnTable thead th').forEach(th => {
       th.addEventListener('click', () => {
         const col = th.dataset.col;
         if (!col) return;
-        if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+        if (sortCol === col) {
+          sortDir *= -1;  // Richtung umdrehen (↑↔↓)
+        } else {
+          sortCol = col;
+          sortDir = 1;    // neu: start mit aufsteigend
+        }
         renderAll();
-        // візуальна стрілка
-        document.querySelectorAll('#turnTable thead th').forEach(h => h.classList.remove('sorted-asc','sorted-desc'));
+
+        // Visuelle Pfeile aktualisieren
+        document.querySelectorAll('#turnTable thead th').forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
         th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
       });
     });
   }
 
-  // ===== Рендер таблиці і графіків =====
-  let scChart, barChart;
+  // =====  Render-Funktionen für Tabelle und Charts =====
+  let scChart, barChart;  // Chart-Instanzen (zum Zerstören vor Neuaufbau)
 
   function renderAll() {
-    // 1) фільтр + сортування
+    // 1) Filter + Sortierung anwenden
     const filtered = applyFilters(rows);
     const data = sortData(filtered);
 
-    // 2) таблиця
+    // 2) Tabelle bauen (mit schöner Formatierung)
     const tbody = document.querySelector('#turnTable tbody');
     tbody.innerHTML = data.map(d => `
       <tr>
         <td>${d.artikel}</td>
-        <td class="text-end">${nf.format(d.umschlag)}</td>
-        <td class="text-end">${nf.format(d.lagerdauer)}</td>
-        <td class="text-end">${nf.format(d.lagerwert)}</td>
-        <td class="text-end">${d.bestand}</td>
-        <td class="text-end">${nf.format(d.vk90)}</td>
-        <td class="text-end">${nf.format(d.cogs90)}</td>
-        <td class="text-end">${nf.format(d.dkost)}</td>
-        <td class="text-end">${nf.format(d.ek_min)}</td>
-        <td class="text-end">${nf.format(d.ek_max)}</td>
+        <td class="text-end">${fmt2(d.umschlag)}</td>
+        <td class="text-end">${fmt2(d.lagerdauer)}</td>
+        <td class="text-end">${fmtEuro(d.lagerwert)}</td>
+        <td class="text-end">${fmtInt(d.bestand)}</td>
+        <td class="text-end">${fmt2(d.vk90)}</td>
+        <td class="text-end">${fmtEuro(d.cogs90)}</td>
+        <td class="text-end">${fmtEuro(d.dkost)}</td>
+        <td class="text-end">${fmtEuro(d.ek_min)}</td>
+        <td class="text-end">${fmtEuro(d.ek_max)}</td>
       </tr>
     `).join('');
 
-    // 3) Bubble: Umschlag vs Lagerdauer (радіус ~ Lagerwert з нормалізацією)
-    const minLW = Math.min(...data.map(d => d.lagerwert), 0);
-    const maxLW = Math.max(...data.map(d => d.lagerwert), 1);
+    // 3) Bubble-Chart: Umschlag (x) vs Lagerdauer (y) — Radius = Lagerwert
+    const minLW = Math.min(...data.map(d => d.lagerwert ?? 0), 0);
+    const maxLW = Math.max(...data.map(d => d.lagerwert ?? 0), 1);
     const rMin = 4, rMax = 18;
     const rScale = v => {
-      const t = (v - minLW) / (maxLW - minLW || 1);
+      const t = ( (v ?? 0) - minLW ) / ( (maxLW - minLW) || 1 );
       return rMin + t * (rMax - rMin);
     };
 
     const bubbleDS = data.map(d => ({
-      x: d.umschlag, y: d.lagerdauer, r: rScale(d.lagerwert), _label: d.artikel,
-      _lw: d.lagerwert
+      x: d.umschlag ?? 0,
+      y: d.lagerdauer ?? 0,
+      r: rScale(d.lagerwert),
+      _label: d.artikel,
+      _lw: d.lagerwert ?? 0
     }));
 
+    // Vorhandenes Chart zerstören → neu zeichnen (sonst Doppel-Canvas)
     if (scChart) scChart.destroy();
     scChart = new Chart(document.getElementById('scatterChart'), {
       type: 'bubble',
@@ -165,13 +215,14 @@
           legend: { display: false },
           tooltip: {
             callbacks: {
+              // Schöne Tooltip-Zeilen mit Einheiten und "€"
               label: (ctx) => {
                 const p = ctx.raw;
                 return [
                   p._label,
-                  `Umschlag: ${nf.format(p.x)}`,
-                  `Lagerdauer: ${nf.format(p.y)} T`,
-                  `Lagerwert: € ${nf.format(p._lw)}`
+                  `Umschlag: ${fmt2(p.x)}`,
+                  `Lagerdauer: ${fmt2(p.y)} T`,
+                  `Lagerwert: € ${fmtEuro(p._lw)}`
                 ];
               }
             }
@@ -184,38 +235,47 @@
       }
     });
 
-    // 4) Bar: Top-15 за Lagerwert
-    const top = [...data].sort((a,b)=> b.lagerwert - a.lagerwert).slice(0,15);
+    // 4) Balken-Chart: Top-15 nach Lagerwert
+    const top = [...data].sort((a,b)=> (b.lagerwert ?? 0) - (a.lagerwert ?? 0)).slice(0,15);
     if (barChart) barChart.destroy();
     barChart = new Chart(document.getElementById('barChart'), {
       type: 'bar',
       data: {
         labels: top.map(d => d.artikel),
-        datasets: [{ label: 'Lagerwert (€)', data: top.map(d => d.lagerwert) }]
+        datasets: [{ label: 'Lagerwert (€)', data: top.map(d => d.lagerwert ?? 0) }]
       },
       options: {
         responsive: true,
-        plugins: { legend: { display:false }, tooltip: { callbacks: {
-          label: (ctx) => `€ ${nf.format(ctx.parsed.y)}`
-        }}},
+        plugins: {
+          legend: { display:false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `€ ${fmtEuro(ctx.parsed.y)}`
+            }
+          }
+        },
         scales: { y: { beginAtZero: true, title: { display: true, text: '€' } } }
       }
     });
   }
 
-  // init
+  // Initialisieren: nach Laden der Seite
   document.addEventListener('DOMContentLoaded', () => {
-    attachSorting();
+    attachSorting();     // Klickbare Sortierung aktivieren
+    renderAll();         // Erstes Rendern (Standard-Filter)
+  });
+
+  // Filter-Button: wendet aktuelle Werte an (ohne Seiten-Reload)
+  document.getElementById('btnApply').addEventListener('click', e => {
+    e.preventDefault();
     renderAll();
   });
-  document.getElementById('btnApply').addEventListener('click', e => { e.preventDefault(); renderAll(); });
 </script>
+
 <style>
-  /* маленький штрих для індикатора напрямку сортування */
+  /*  optischer Sortier-Indikator an Kopfzeile */
   #turnTable thead th.sorted-asc::after  { content:" ↑"; font-weight:600; }
   #turnTable thead th.sorted-desc::after { content:" ↓"; font-weight:600; }
 </style>
-
-
 
 {% endblock %}

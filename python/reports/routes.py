@@ -384,16 +384,16 @@ def report_articles():
 
 
 # Lagerwarnung (niedriger Bestand)
-# URL: /reports/stock_low?limit=1000
+# URL: /reports/stock_low?limit=3000
 @reports_bp.get("/stock_low")
 @login_required
 def report_stock_low():
-    # Schwellwert aus Parametern (Fallback 1000)
-    threshold = request.args.get("limit", "1000")
+    # Schwellwert aus Parametern (Fallback 3000)
+    threshold = request.args.get("limit", "3000")
     try:
         threshold = int(threshold)
     except ValueError:
-        threshold = 1000
+        threshold = 3000
 
     rows = []
     conn = get_conn()

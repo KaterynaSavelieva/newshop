@@ -1,9 +1,15 @@
+{# ───────────────────────────────────────────────
+  reports_stock_low.html
+  Zeigt Artikel mit niedrigem Lagerbestand (unter Schwelle)
+─────────────────────────────────────────────── #}
+
 {% extends "base.html" %}
 {% block title %}Lagerwarnung / Artikel mit niedrigem Bestand{% endblock %}
 
 {% block content %}
 
 <style>
+  /*  Gestaltung der Seite */
   .chart-wrap {
     position: relative;
     width: 100%;
@@ -13,17 +19,21 @@
   }
 </style>
 
+<!--  Überschrift -->
 <div class="d-flex align-items-center justify-content-between mb-3">
   <h3 class="mb-0">Lagerwarnung / Artikel mit niedrigem Bestand</h3>
 </div>
 
-<!-- 🔎 Фільтри -->
+<!--  Filterformular (Schwellenwert) -->
 <form class="filters" method="get" action="{{ url_for('reports.report_stock_low') }}">
   <div class="row g-3 mb-3">
+    <!-- Eingabe: Schwellenwert -->
     <div class="col-sm-3 col-md-2">
       <label class="form-label">Schwellenwert (Stück)</label>
       <input type="number" name="limit" min="0" step="1" value="{{ threshold }}" class="form-control">
     </div>
+
+    <!-- Buttons: Filtern / Zurücksetzen -->
     <div class="col-sm-4 col-md-3 d-flex align-items-end">
       <button class="btn btn-primary me-2" type="submit">Filtern</button>
       <a class="btn btn-outline-secondary" href="{{ url_for('reports.report_stock_low') }}">Zurücksetzen</a>
@@ -31,19 +41,23 @@
   </div>
 </form>
 
-<!-- 🧾 Рядок “що відфільтровано” -->
+<!--  Infozeile: zeigt aktuellen Filter -->
 <div class="alert alert-light border py-2 mb-3">
-  Gefiltert → <span class="badge bg-secondary">Schwelle: {{ threshold }}</span>
-  {% if rows %}<span class="badge bg-info text-dark ms-2">Treffer: {{ rows|length }}</span>{% endif %}
+  Gefiltert →
+  <span class="badge bg-secondary">Schwelle: {{ threshold }}</span>
+  {% if rows %}
+    <span class="badge bg-info text-dark ms-2">Treffer: {{ rows|length }}</span>
+  {% endif %}
 </div>
 
+<!-- Wenn keine Artikel unter Schwelle -->
 {% if not rows %}
   <div class="alert alert-success">
-    ✅ Keine Artikel unter dem Schwellenwert gefunden.
+     Keine Artikel unter dem Schwellenwert gefunden.
   </div>
-{% else %}
 
-<!-- 📈 Графік -->
+{% else %}
+<!--  Diagramm -->
 <div class="card mb-3">
   <div class="card-header py-2">Bestand je Artikel (rot = unter Schwelle)</div>
   <div class="card-body">
@@ -53,7 +67,7 @@
   </div>
 </div>
 
-<!-- 📋 Таблиця -->
+<!--  Tabelle mit Artikeln -->
 <div class="table-responsive">
   <table class="table table-sm table-striped table-bordered align-middle">
     <thead class="table-light">
@@ -65,45 +79,46 @@
         <th class="text-end">Differenz</th>
       </tr>
     </thead>
+
     <tbody>
       {% for r in rows %}
-      {# r: [0]=artikelID, [1]=artikel, [2]=lagerbestand, [3]=schwelle, [4]=differenz #}
+      {# r = [0]=ArtikelID, [1]=Name, [2]=Lagerbestand, [3]=Schwelle, [4]=Differenz #}
       <tr class="{% if r[2] < threshold %}table-warning{% endif %}">
         <td>{{ loop.index }}</td>
         <td>{{ r[1] }}</td>
-        <td class="text-end">{{ r[2] }}</td>
-        <td class="text-end">{{ threshold }}</td>
-        <td class="text-end">{{ r[4] }}</td>
+        <td class="text-end">{{ r[2] | thousands(0) }}</td>
+        <td class="text-end">{{ threshold | thousands(0) }}</td>
+        <td class="text-end">{{ r[4] | thousands(0) }}</td>
       </tr>
       {% endfor %}
     </tbody>
+
+    <!-- Summenzeile unten -->
     <tfoot class="table-light">
       <tr>
         <th colspan="2">Summe</th>
-        <th class="text-end">
-          {{ rows|map(attribute=2)|sum }}
-        </th>
-        <th class="text-end">{{ threshold }}</th>
-        <th class="text-end">
-          {{ rows|map(attribute=4)|sum }}
-        </th>
+        <th class="text-end">{{ rows|map(attribute=2)|sum | thousands(0) }}</th>
+        <th class="text-end">{{ threshold | thousands(0) }}</th>
+        <th class="text-end">{{ rows|map(attribute=4)|sum | thousands(0) }}</th>
       </tr>
     </tfoot>
   </table>
 </div>
 
+<!--  Chart.js: Balken + Schwellenlinie -->
 <script>
-  // Дані з сервера
-  const labels   = {{ rows|map(attribute=1)|list|tojson }};  // артикули
-  const stocks   = {{ rows|map(attribute=2)|list|tojson }};  // залишок
-  const threshold = {{ threshold|int }};
+  // Daten vom Server (Python → JavaScript)
+  const labels     = {{ rows|map(attribute=1)|list|tojson }};  // Artikelnamen
+  const stocks     = {{ rows|map(attribute=2)|list|tojson }};  // Lagerbestände
+  const threshold  = {{ threshold|int }};                      // Schwellenwert
 
-  // Кольори: червоний якщо < порогу, інакше базовий
-  const colors = stocks.map(v => v < threshold ? 'rgba(220, 53, 69, 0.6)' : 'rgba(13, 110, 253, 0.6)');
+  // Farben: rot wenn unter Schwelle, blau sonst
+  const colors  = stocks.map(v => v < threshold ? 'rgba(220, 53, 69, 0.6)' : 'rgba(13, 110, 253, 0.6)');
   const borders = stocks.map(v => v < threshold ? 'rgba(220, 53, 69, 1)'   : 'rgba(13, 110, 253, 1)');
 
+  //  Diagramm erstellen
   const ctx = document.getElementById('stockChart').getContext('2d');
-  const chart = new Chart(ctx, {
+  new Chart(ctx, {
     data: {
       labels,
       datasets: [
