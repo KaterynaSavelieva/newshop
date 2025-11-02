@@ -81,7 +81,7 @@ def f_get_period(default_days=30):
     von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=default_days)).isoformat()
     return von, bis
 
-def f_get_filters(include=("kunden", "artikel", "kundentypen", "lieferanten")):
+def f_get_filters(include=("kunden", "artikel", "kundentypen")):
     result = []
     if "kunden" in include:
         result.append(request.args.getlist("kunden"))
@@ -89,7 +89,5 @@ def f_get_filters(include=("kunden", "artikel", "kundentypen", "lieferanten")):
         result.append(request.args.getlist("artikel"))
     if "kundentypen" in include:
         result.append(request.args.getlist("kundentypen"))
-    if "lieferanten" in include:
-        result.append(request.args.getlist("lieferanten"))
     return tuple(result)
 
