@@ -1,6 +1,7 @@
 from datetime import date, timedelta
+from flask import request
 
-# 🔹 Gibt einen SQL-Ausdruck für die Gruppierung nach Datum zurück.
+# Gibt einen SQL-Ausdruck für die Gruppierung nach Datum zurück.
 #    grp: 'day' | 'month' | 'year'
 #    column: Spaltenname (z. B. 'verkaufsdatum')
 def f_group_expr(grp: str, column: str) -> str:
@@ -15,7 +16,7 @@ def f_group_expr(grp: str, column: str) -> str:
         return f"DATE({column})"                    # Beispiel: 2025-11-01
 
 
-# 🔹 Erstellt eine kurze Textliste der ausgewählten Elemente.
+# Erstellt eine kurze Textliste der ausgewählten Elemente.
 #    Wird im Bericht unter "Gefiltert → ..." verwendet.
 def f_labels_for(selected_ids, pairs, limit: int = 6) -> str:
     if not selected_ids or not pairs:
@@ -34,7 +35,7 @@ def f_labels_for(selected_ids, pairs, limit: int = 6) -> str:
     return ", ".join(names[:limit]) + f" … (+{len(names)-limit})"
 
 
-# 🔹 Baut den WHERE-Teil eines SQL-Befehls und die Parameterliste.
+# Baut den WHERE-Teil eines SQL-Befehls und die Parameterliste.
 #    Die Tabelle/VIEWS müssen Spalten haben:
 #    verkaufsdatum, kundenID, kundentypID, artikelID
 def f_build_where_sql(von: str, bis: str,
@@ -68,3 +69,27 @@ def f_build_where_sql(von: str, bis: str,
         params.extend(artikel_sel)
 
     return where_sql, params
+
+
+def f_get_period(default_days=30):
+    """
+    Liest die Parameter 'von' und 'bis' aus request.args.
+    Wenn sie fehlen, wird der Zeitraum der letzten X Tage genommen (Standard: 30).
+    Gibt (von, bis) im ISO-Format zurück.
+    """
+    bis = request.args.get("bis") or date.today().isoformat()
+    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=default_days)).isoformat()
+    return von, bis
+
+def f_get_filters(include=("kunden", "artikel", "kundentypen", "lieferanten")):
+    result = []
+    if "kunden" in include:
+        result.append(request.args.getlist("kunden"))
+    if "artikel" in include:
+        result.append(request.args.getlist("artikel"))
+    if "kundentypen" in include:
+        result.append(request.args.getlist("kundentypen"))
+    if "lieferanten" in include:
+        result.append(request.args.getlist("lieferanten"))
+    return tuple(result)
+

@@ -1,51 +1,91 @@
-# python/reports/routes.py
-from datetime import date, timedelta
+#   Reports-Modul
+# Dieses Modul enthält alle Routen (Seiten) für Berichte unter /reports/…
+
 from flask import Blueprint, render_template, request
 from flask_login import login_required
 from ..db import get_conn
-from .service import f_group_expr, f_labels_for, f_build_where_sql
+from .service import (
+    f_group_expr,     # baut SQL-Ausdruck für Gruppierung nach Tag/Monat/Jahr/Quartal
+    f_labels_for,     # wandelt ausgewählte IDs in kurze Namenliste für "Gefiltert → …"
+    f_build_where_sql,# baut WHERE-Teil + Parameter je nach Filtern und Zeitraum
+    f_get_period,     # liest von/bis aus URL oder nimmt Standard (z. B. letzte 30 Tage)
+    f_get_filters     # liest Listen von ausgewählten IDs (kunden, artikel, kundentypen)
+)
 
+
+#  Blueprint für alle Report-Seiten (alle URLs beginnen mit /reports/)
+# Ein Blueprint ist wie ein "Mini-App-Modul": wir sammeln thematisch passende
+# Routen zusammen (hier: Reports) und registrieren sie später im Haupt-Flask-App.
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
+
+# Bericht: Tages-, Monats- oder Jahresübersicht
+# URL: /reports/daily?von=YYYY-MM-DD&bis=YYYY-MM-DD&grp=day|month|year
 @reports_bp.get("/daily")
-@login_required
+@login_required  # Seite nur für eingeloggte Benutzer
 def report_daily():
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+    # Zeitraum lesen (Standard: letzte 30 Tage bis heute).
+    # f_get_period(30) liefert ein Tupel (von, bis) als ISO-Datum.
+    von, bis = f_get_period(30)
+
+    # Gruppierung: 'day'/'month'/'year' (kommt aus URL-Parameter ?grp=…)
     grp = request.args.get("grp", "day")
 
-    kunden_sel    = request.args.getlist("kunden")
-    artikel_sel   = request.args.getlist("artikel")
-    kundentyp_sel = request.args.getlist("kundentypen")
+    #  Filter aus der URL: mehrere Kunden/Artikel/Kundentypen sind möglich.
+    # Ergebnis: drei Listen mit IDs (Strings).
+    kunden_sel, artikel_sel, kundentyp_sel = f_get_filters()
 
     rows, totals = [], {}
+    #  Verbindung zur Datenbank holen
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
+            #  Stammdaten (Listen) laden, damit die Filter-Dropdowns in der UI
+            # Namen statt IDs zeigen können.
+            cur.execute("""
+                SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde
+                FROM kunden
+                ORDER BY kunde
+            """)
             kunden_list = cur.fetchall()
-            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
+
+            cur.execute("""
+                SELECT kundentypID, bezeichnung AS typ
+                FROM kundentyp
+                ORDER BY typ
+            """)
             kundentyp_list = cur.fetchall()
-            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
+
+            cur.execute("""
+                SELECT artikelID, produktname AS artikel
+                FROM artikel
+                ORDER BY artikel
+            """)
             artikel_list = cur.fetchall()
 
-            where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
+            #  WHERE-Teil + Parameter dynamisch bauen
+            where_sql, params = f_build_where_sql(
+                von, bis, kunden_sel, kundentyp_sel, artikel_sel
+            )
+
+            # 🏷 SQL-Ausdruck für Gruppierung wählen (DATE(), DATE_FORMAT(…))
             label_expr = f_group_expr(grp, "verkaufsdatum")
 
+            #  Daten aus Sicht v_sales laden und zusammenfassen
             cur.execute(
                 f"""
                 SELECT
-                  {label_expr} AS tag,
-                  COUNT(*)     AS positionen,
-                  SUM(menge)   AS menge,
-                  ROUND(SUM(rabatt_eur), 2)          AS rabatt_eur,
-                  ROUND(SUM(umsatz), 2)              AS umsatz,
-                  ROUND(SUM(kosten), 2)              AS kosten,
-                  ROUND(SUM(marge), 2)               AS marge,
-                  ROUND(SUM(umsatz_brutto), 2)       AS umsatz_brutto,
-                  ROUND(SUM(marge_brutto), 2)        AS marge_brutto,
-                  ROUND(100 * SUM(marge) / NULLIF(SUM(umsatz), 0), 2)            AS marge_prozent,
-                  ROUND(100 * SUM(marge_brutto) / NULLIF(SUM(umsatz_brutto), 0), 2) AS marge_brutto_prozent
+                  {label_expr} AS tag,                          -- 0 Zeitlabel
+                  COUNT(*)     AS positionen,                   -- 1 Anzahl Zeilen
+                  SUM(menge)   AS menge,                        -- 2 Menge gesamt
+                  ROUND(SUM(rabatt_eur), 2)          AS rabatt_eur,       -- 3
+                  ROUND(SUM(umsatz), 2)              AS umsatz,           -- 4
+                  ROUND(SUM(kosten), 2)              AS kosten,           -- 5
+                  ROUND(SUM(marge), 2)               AS marge,            -- 6
+                  ROUND(SUM(umsatz_brutto), 2)       AS umsatz_brutto,    -- 7
+                  ROUND(SUM(marge_brutto), 2)        AS marge_brutto,     -- 8
+                  ROUND(100 * SUM(marge) / NULLIF(SUM(umsatz), 0), 2)            AS marge_prozent,        -- 9
+                  ROUND(100 * SUM(marge_brutto) / NULLIF(SUM(umsatz_brutto), 0), 2) AS marge_brutto_prozent -- 10
                 FROM v_sales
                 WHERE {where_sql}
                 GROUP BY {label_expr}
@@ -54,8 +94,10 @@ def report_daily():
                 params
             )
             rows = cur.fetchall()
+        # 🔒 Verbindung sauber schließen
         conn.close()
 
+    #  Gesamtsummen über alle Zeilen berechnen (für Fußzeile/Kacheln)
     if rows:
         totals = {
             "positionen": sum(r[1] for r in rows),
@@ -68,8 +110,14 @@ def report_daily():
             "marge_br":   float(sum(r[8] for r in rows)),
         }
     else:
-        totals = {"positionen":0,"menge":0.0,"rabatt_eur":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0,"umsatz_br":0.0,"marge_br":0.0}
+        # Kein Ergebnis → alles auf Null setzen (verhindert Fehler im Template)
+        totals = {
+            "positionen": 0, "menge": 0.0, "rabatt_eur": 0.0,
+            "umsatz": 0.0, "kosten": 0.0, "marge": 0.0,
+            "umsatz_br": 0.0, "marge_br": 0.0
+        }
 
+    #  Lesbare Filter-Zeile zusammenbauen („Gefiltert → …“)
     kunden_txt    = f_labels_for(kunden_sel,    locals().get("kunden_list", []))
     kundentyp_txt = f_labels_for(kundentyp_sel, locals().get("kundentyp_list", []))
     artikel_txt   = f_labels_for(artikel_sel,   locals().get("artikel_list", []))
@@ -80,6 +128,7 @@ def report_daily():
     if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
     filter_line = "Gefiltert → " + " · ".join(parts)
 
+    # HTML-Template mit Daten füllen
     return render_template(
         "reports_daily.html",
         title=f"Umsatz pro {grp}",
@@ -93,16 +142,19 @@ def report_daily():
     )
 
 
+
+# Top-Kunden nach Umsatz
+# URL: /reports/customers?top=20&von=…&bis=… (Filter analog)
 @reports_bp.get("/customers")
 @login_required
 def report_customers():
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+    # Zeitraum: Standard letzte 30 Tage
+    von, bis = f_get_period(30)
 
-    kunden_sel    = request.args.getlist("kunden")
-    artikel_sel   = request.args.getlist("artikel")
-    kundentyp_sel = request.args.getlist("kundentypen")
+    # Filter-IDs (Mehrfachauswahl)
+    kunden_sel, artikel_sel, kundentyp_sel = f_get_filters()
 
+    # Sicherstellen, dass top_n in sinnvollem Bereich bleibt
     try:
         top_n = int(request.args.get("top", "20"))
     except ValueError:
@@ -113,15 +165,34 @@ def report_customers():
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde FROM kunden ORDER BY kunde")
+            # Stammlisten (für Filter in der UI)
+            cur.execute("""
+                SELECT kundenID, CONCAT(vorname,' ',nachname) AS kunde
+                FROM kunden
+                ORDER BY kunde
+            """)
             kunden_list = cur.fetchall()
-            cur.execute("SELECT kundentypID, bezeichnung AS typ FROM kundentyp ORDER BY typ")
+
+            cur.execute("""
+                SELECT kundentypID, bezeichnung AS typ
+                FROM kundentyp
+                ORDER BY typ
+            """)
             kundentyp_list = cur.fetchall()
-            cur.execute("SELECT artikelID, produktname AS artikel FROM artikel ORDER BY artikel")
+
+            cur.execute("""
+                SELECT artikelID, produktname AS artikel
+                FROM artikel
+                ORDER BY artikel
+            """)
             artikel_list = cur.fetchall()
 
-            where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
+            # WHERE und Parameter
+            where_sql, params = f_build_where_sql(
+                von, bis, kunden_sel, kundentyp_sel, artikel_sel
+            )
 
+            # Aggregation pro Kunde (absteigend nach Umsatz)
             sql = f"""
                 SELECT
                   kundenID,
@@ -131,7 +202,9 @@ def report_customers():
                   ROUND(SUM(umsatz), 2)               AS umsatz,
                   ROUND(SUM(kosten), 2)               AS kosten,
                   ROUND(SUM(umsatz) - SUM(kosten), 2) AS marge,
-                  ROUND(100 * (SUM(umsatz) - SUM(kosten)) / NULLIF(SUM(umsatz), 0), 2) AS marge_prozent
+                  ROUND(
+                    100 * (SUM(umsatz) - SUM(kosten)) / NULLIF(SUM(umsatz), 0), 2
+                  ) AS marge_prozent
                 FROM v_sales
                 WHERE {where_sql}
                 GROUP BY kundenID, kunde
@@ -142,6 +215,7 @@ def report_customers():
             rows = cur.fetchall()
         conn.close()
 
+    # Summen für Fußzeile
     if rows:
         totals = {
             "positionen": sum(r[2] for r in rows),
@@ -151,8 +225,9 @@ def report_customers():
             "marge":      float(sum(r[6] for r in rows)),
         }
     else:
-        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
+        totals = {"positionen": 0, "menge": 0.0, "umsatz": 0.0, "kosten": 0.0, "marge": 0.0}
 
+    # Lesbare „Gefiltert → …“-Zeile
     kunden_txt    = f_labels_for(kunden_sel,    locals().get("kunden_list", []))
     kundentyp_txt = f_labels_for(kundentyp_sel, locals().get("kundentyp_list", []))
     artikel_txt   = f_labels_for(artikel_sel,   locals().get("artikel_list", []))
@@ -176,17 +251,23 @@ def report_customers():
     )
 
 
+#  Artikel-Report oder Zeitreihe für EINEN Artikel
+# URL: /reports/articles?grp=items|day|month|year
 @reports_bp.get("/articles")
 @login_required
 def report_articles():
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=30)).isoformat()
+    # Zeitraum: letzte 30 Tage
+    von, bis = f_get_period(30)
 
-    artikel_sel   = request.args.getlist("artikel")
-    kunden_sel    = request.args.getlist("kunden")
-    kundentyp_sel = request.args.getlist("kundentypen")
+    # Filter-IDs
+    kunden_sel, artikel_sel, kundentyp_sel = f_get_filters()
+
+    # Modus:
+    #   - "items": Top-Artikel nach Umsatz
+    #   - "day"/"month"/"year": Zeitreihe (nur wenn GENAU ein Artikel gewählt ist)
     grp = request.args.get("grp", "items")
 
+    # Top-N Begrenzung
     try:
         top_n = int(request.args.get("top", "20"))
     except ValueError:
@@ -194,21 +275,28 @@ def report_articles():
     top_n = max(5, min(top_n, 100))
 
     rows, totals = [], {}
-    ts_mode_msg = None
+    ts_mode_msg = None  # Hinweistext, falls Zeitreihe ohne Einzelwahl versucht wird
 
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
+            # Stammlisten
             cur.execute("SELECT artikelID, produktname FROM artikel ORDER BY produktname")
             artikel_list = cur.fetchall()
+
             cur.execute("SELECT kundenID, CONCAT(vorname,' ',nachname) FROM kunden ORDER BY 2")
             kunden_list = cur.fetchall()
+
             cur.execute("SELECT kundentypID, bezeichnung FROM kundentyp ORDER BY bezeichnung")
             kundentyp_list = cur.fetchall()
 
-            where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
+            # WHERE aufbauen
+            where_sql, params = f_build_where_sql(
+                von, bis, kunden_sel, kundentyp_sel, artikel_sel
+            )
 
             if grp == "items":
+                # Top-Artikel nach Umsatz
                 sql = f"""
                     SELECT
                       artikelID,
@@ -228,6 +316,7 @@ def report_articles():
                 cur.execute(sql, params)
                 rows = cur.fetchall()
             else:
+                # Zeitreihe benötigt genau EINEN Artikel
                 if len(artikel_sel) != 1:
                     ts_mode_msg = "Bitte genau einen Artikel wählen, um einen Zeitverlauf anzuzeigen."
                 else:
@@ -252,12 +341,14 @@ def report_articles():
                     rows = cur.fetchall()
         conn.close()
 
+    #  Gesamtsummen korrekt je Modus
     if rows:
-        pos_idx   = 2 if grp == "items" else 1
-        menge_idx = 3 if grp == "items" else 2
-        umsatz_idx= 4 if grp == "items" else 3
-        kosten_idx= 5 if grp == "items" else 4
-        marge_idx = 6 if grp == "items" else 5
+        # Indexe je nach SELECT-Form
+        pos_idx    = 2 if grp == "items" else 1
+        menge_idx  = 3 if grp == "items" else 2
+        umsatz_idx = 4 if grp == "items" else 3
+        kosten_idx = 5 if grp == "items" else 4
+        marge_idx  = 6 if grp == "items" else 5
         totals = {
             "positionen": sum(r[pos_idx] for r in rows),
             "menge":      float(sum(r[menge_idx] for r in rows)),
@@ -266,17 +357,18 @@ def report_articles():
             "marge":      float(sum(r[marge_idx]  for r in rows)),
         }
     else:
-        totals = {"positionen":0,"menge":0.0,"umsatz":0.0,"kosten":0.0,"marge":0.0}
+        totals = {"positionen": 0, "menge": 0.0, "umsatz": 0.0, "kosten": 0.0, "marge": 0.0}
 
+    # Lesbare Filterzeile
     artikel_txt   = f_labels_for(artikel_sel,   locals().get("artikel_list", []))
     kunden_txt    = f_labels_for(kunden_sel,    locals().get("kunden_list", []))
     kundentyp_txt = f_labels_for(kundentyp_sel, locals().get("kundentyp_list", []))
 
-    parts=[f"von: {von}", f"bis: {bis}", f"Modus: {'Artikel' if grp=='items' else grp}"]
+    parts = [f"von: {von}", f"bis: {bis}", f"Modus: {'Artikel' if grp=='items' else grp}"]
     if artikel_txt:   parts.append(f"Artikel: {artikel_txt}")
     if kunden_txt:    parts.append(f"Kunde: {kunden_txt}")
     if kundentyp_txt: parts.append(f"Kundentyp: {kundentyp_txt}")
-    filter_line="Gefiltert → "+" · ".join(parts)
+    filter_line = "Gefiltert → " + " · ".join(parts)
 
     return render_template(
         "reports_articles.html",
@@ -290,9 +382,13 @@ def report_articles():
         filter_line=filter_line, ts_mode_msg=ts_mode_msg,
     )
 
+
+# Lagerwarnung (niedriger Bestand)
+# URL: /reports/stock_low?limit=1000
 @reports_bp.get("/stock_low")
 @login_required
 def report_stock_low():
+    # Schwellwert aus Parametern (Fallback 1000)
     threshold = request.args.get("limit", "1000")
     try:
         threshold = int(threshold)
@@ -303,6 +399,7 @@ def report_stock_low():
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
+            # Einfache Liste: alle Artikel unterhalb der Schwelle
             cur.execute(
                 """
                 SELECT
@@ -327,7 +424,10 @@ def report_stock_low():
     )
 
 
+#  Lagerumschlag 90 Tage (für JavaScript-Charts/Tabellen)
+# URL: /reports/turnover
 import json
+
 @reports_bp.get("/turnover")
 @login_required
 def report_turnover():
@@ -335,6 +435,8 @@ def report_turnover():
     conn = get_conn()
     if conn:
         with conn.cursor() as cur:
+            # Werte aus vorbereiteter Sicht v_umschlag_90tage:
+            # enthält Bestände, Durchschnittskosten, COGS 90, Umschlag u. a.
             cur.execute("""
                 SELECT
                     artikelID,          -- 0
@@ -344,7 +446,7 @@ def report_turnover():
                     lagerwert_now,      -- 4
                     min_einkaufspreis,  -- 5
                     max_einkaufspreis,  -- 6
-                    verkaufsmenge_90,   -- 7   
+                    verkaufsmenge_90,   -- 7
                     cogs_90,            -- 8
                     umschlag_90_approx, -- 9
                     lagerdauer_tage     -- 10
@@ -354,7 +456,7 @@ def report_turnover():
             rows = cur.fetchall()
         conn.close()
 
-    # перетворимо у масив словників для фронтенду
+    # Für das Frontend in ein JSON-freundliches Format bringen
     rows_dict = [
         {
             "artikelID": r[0],
@@ -375,35 +477,35 @@ def report_turnover():
     return render_template(
         "reports_turnover.html",
         title="Umschlag 90 Tage",
-        rows=rows,                          # щоб можна було й Jinja-таблицю зробити
-        rows_json=json.dumps(rows_dict)     # <-- головне для JS
+        rows=rows,                      # optional auch als Jinja-Tabelle nutzbar
+        rows_json=json.dumps(rows_dict) # Hauptdaten für JS
     )
 
 
-
-# --- Pareto 80/20 ---
+# ️ Pareto 80/20 (Umsatz oder Marge)
+# URL: /reports/pareto?by=artikel|kunde&k=umsatz|marge&von=…&bis=…
 @reports_bp.get("/pareto")
 @login_required
 def report_pareto():
-    from datetime import date, timedelta
+    # Zeitraum (Standard: letzte 90 Tage)
+    von, bis = f_get_period(90)
 
-    # ── Фільтри
-    bis = request.args.get("bis") or date.today().isoformat()
-    von = request.args.get("von") or (date.fromisoformat(bis) - timedelta(days=90)).isoformat()
-    by  = request.args.get("by", "artikel")     # 'artikel' | 'kunde'
-    k   = request.args.get("k", "umsatz")       # 'umsatz' | 'marge'
+    # Dimension: nach Artikel oder Kunde gruppieren?
+    by = request.args.get("by", "artikel")  # 'artikel' | 'kunde'
+    # Kennzahl: Umsatz oder Marge betrachten?
+    k  = request.args.get("k", "umsatz")    # 'umsatz' | 'marge'
 
-    # ── Валідація параметра метрики
+    # Metrik absichern
     k = k.lower()
     if k not in ("umsatz", "marge"):
         k = "umsatz"
 
-    # ── Вибір поля з v_sales
-    metric_col = "SUM(umsatz)" if k == "umsatz" else "SUM(marge)"
-    metric_label = "Umsatz (€)" if k == "umsatz" else "Marge (€)"
-    page_title = f"Pareto 80/20 – {metric_label} pro {'Artikel' if by=='artikel' else 'Kunde'}"
+    # SQL-Spalte für Aggregation definieren + lesbare Beschriftung
+    metric_col   = "SUM(umsatz)" if k == "umsatz" else "SUM(marge)"
+    metric_label = "Umsatz (€)"   if k == "umsatz" else "Marge (€)"
+    page_title   = f"Pareto 80/20 – {metric_label} pro {'Artikel' if by=='artikel' else 'Kunde'}"
 
-    # ── SQL (агрегація по вибраній метриці)
+    # SQL je nach Dimension zusammenstellen
     if by == "kunde":
         sql = f"""
             SELECT
@@ -432,10 +534,11 @@ def report_pareto():
     if conn:
         with conn.cursor() as cur:
             cur.execute(sql, (von, bis))
-            rows = cur.fetchall()   # [(id, name, metric), ...]
+            # Ergebnis ist Liste von Tupeln: (id, name, metric)
+            rows = cur.fetchall()
         conn.close()
 
-    # ── Обрахунок часток і кумулятиву
+    # Anteil je Zeile und kumulierten Anteil berechnen
     total = float(sum(r[2] for r in rows)) or 1.0
     data, cum, top80_count = [], 0.0, 0
     for i, (rid, name, val) in enumerate(rows, start=1):
@@ -443,22 +546,22 @@ def report_pareto():
         share = (value / total) * 100.0
         cum += share
         d = {
-            "rank": i,
-            "id": rid,
-            "name": name,
-            "value": round(value, 2),
-            "share": round(share, 2),
-            "cum_share": round(cum, 2),
-            "in80": cum <= 80.0
+            "rank": i,                 # Rangplatz
+            "id": rid,                 # Primärschlüssel
+            "name": name,              # Anzeigename
+            "value": round(value, 2),  # Wert (Umsatz oder Marge)
+            "share": round(share, 2),  # Anteil in %
+            "cum_share": round(cum, 2),# kumulativer Anteil in %
+            "in80": cum <= 80.0        # True, solange kumulativ ≤ 80 %
         }
         data.append(d)
         if d["in80"]:
-            top80_count = i
+            top80_count = i  # wie viele Einträge bilden die 80 %
 
     total_items = len(data)
     top80_pct = round((top80_count / total_items) * 100, 1) if total_items else 0.0
 
-    # ── Графік: беремо перші 25 барів (читабельність)
+    # Für das Chart nur die ersten 25 Einträge (besser lesbar)
     chart_labels   = [d["name"] for d in data[:25]]
     chart_bars     = [d["value"] for d in data[:25]]
     chart_cum_line = [d["cum_share"] for d in data[:25]]
@@ -467,13 +570,13 @@ def report_pareto():
         "reports_pareto.html",
         title=page_title,
         by=by, von=von, bis=bis,
-        k=k,                              # поточна метрика
-        metric_label=metric_label,        # текст для легенди/шапки
+        k=k,                       # gewählte Kennzahl (umsatz/marge)
+        metric_label=metric_label, # Text in Legende/Überschrift
         total=round(total, 2),
         top80_count=top80_count,
         top80_pct=top80_pct,
-        rows=data,
-        chart_labels=chart_labels,
-        chart_bars=chart_bars,
-        chart_cum_line=chart_cum_line,
+        rows=data,                 # Tabelle
+        chart_labels=chart_labels, # X-Achse der Balken
+        chart_bars=chart_bars,     # Werte (Balken)
+        chart_cum_line=chart_cum_line, # kumulative % (Linie)
     )

@@ -24,9 +24,9 @@ def ranges_for_type(kundentyp: str):
     if t == "silber":
         return (1, 50), (1, 50)
     if t == "gold":
-        return (1, 100), (1, 100)
+        return (5, 100), (5, 100)
     if t == "platin":
-        return (1, 150), (1, 150)
+        return (10, 200), (10, 200)
     # дефолт — як Standard
     return (1, 25), (1, 25)
 

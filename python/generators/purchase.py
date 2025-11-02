@@ -1,16 +1,10 @@
-# 🔹 Якщо запас товару < 20 → робимо закупку у випадкового постачальника,
-#    який має прив'язку в artikellieferant.
-# 🔹 К-сть на позицію: випадково 30..80
-# 🔹 Якщо в одного постачальника кілька таких товарів — робимо ОДИН документ на постачальника.
-# 🔹 Дата закупки: NOW()
-
 import random
 from datetime import datetime
 from db import get_conn
 
 def fetch_low_stock(cur):
     # товари з запасом < 1000
-    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 1000;")
+    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 2000;")
     return cur.fetchall()  # [(artikelID, name, bestand), ...]
 
 def pick_random_supplier(cur, artikel_id):
@@ -49,7 +43,7 @@ def main():
         with conn.cursor() as cur:
             low = fetch_low_stock(cur)
             if not low:
-                print("Es gibt keine Produkte mit einem Lagerbestand von < 1000. Kein Kauf erforderlich.")
+                print("Es gibt keine Produkte mit einem Lagerbestand von < 2000. Kein Kauf erforderlich.")
                 return
 
             # згрупуємо товари за постачальником: {lieferantID: [(artikelID, menge, preis), ...]}
@@ -62,7 +56,7 @@ def main():
                     skipped.append((artikel_id, name))
                     continue
                 lieferant_id, preis = sup
-                menge = random.randint(100, 450)  # випадково 25-120
+                menge = random.randint(200, 2000)  # випадково 25-120
                 plan.setdefault(lieferant_id, []).append((artikel_id, menge, preis))
 
             if not plan:
