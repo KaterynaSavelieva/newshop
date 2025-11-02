@@ -576,6 +576,9 @@ def report_pareto():
         value = float(umsatz if k == "umsatz" else marge)
         share = (value / total_metric) * 100.0
         cum += share
+
+        marge_pct = (float(marge or 0) / float(umsatz or 1)) * 100.0 if umsatz else 0.0
+
         rec = {
             "rank": i,
             "id": rid,
@@ -583,6 +586,7 @@ def report_pareto():
             "typ": typ,                     # може бути None для artikel
             "umsatz": float(umsatz or 0.0),
             "marge":  float(marge  or 0.0),
+            "marge_pct": round(marge_pct, 2),
             "value":  round(value, 2),      # значення обраної метрики
             "share":  round(share, 2),
             "cum_share": round(cum, 2),
@@ -597,6 +601,7 @@ def report_pareto():
         "umsatz": round(sum(d["umsatz"] for d in data), 2),
         "marge":  round(sum(d["marge"]  for d in data), 2),
     }
+    sums["marge_pct"] = round((sums["marge"] / sums["umsatz"]) * 100, 2) if sums["umsatz"] else 0.0
 
     # дані для графіка (беремо перші 30 — читабельніше)
     chart_labels   = [d["name"] for d in data[:30]]

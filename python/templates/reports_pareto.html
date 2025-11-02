@@ -100,6 +100,7 @@
           {% endif %}
           <th class="text-end">Umsatz (€)</th>
           <th class="text-end">Marge (€)</th>
+          <th class="text-end">Marge (%)</th>
           <th class="text-end">Anteil (%)</th>
           <th class="text-end">Kumulativ (%)</th>
           <th class="text-center">Top&nbsp;80%</th>
@@ -117,6 +118,7 @@
           <!-- schöne Geldformate mit deinem Filter `thousands` -->
           <td class="text-end">{{ r.umsatz | thousands }}</td>
           <td class="text-end">{{ r.marge  | thousands }}</td>
+          <td class="text-end">{{ r.marge_pct | thousands(2) }} %</td>
           <td class="text-end">{{ r.share      | thousands(2) }}</td>
           <td class="text-end">{{ r.cum_share  | thousands(2) }}</td>
           <td class="text-center">
@@ -137,6 +139,7 @@
           <th colspan="{% if by=='kunde' %}3{% else %}2{% endif %}">Summe</th>
           <th class="text-end">{{ sums.umsatz | thousands }}</th>
           <th class="text-end">{{ sums.marge  | thousands }}</th>
+          <th class="text-end">{{ sums.marge_pct | thousands(2) }} %</th>
           <th class="text-end">100,00</th>
           <th class="text-end">100,00</th>
           <th></th>
