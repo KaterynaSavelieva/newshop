@@ -1,14 +1,36 @@
+# purhase.py – erzeugt automatisch Einkäufe für Artikel mit geringem Lagerbestand
+# Idee:
+#  - Suche alle Artikel mit Lagerbestand < 3000.
+#  - Finde zufällige Lieferanten, die diese Artikel liefern können.
+#  - Erstelle automatisch Einkäufe (einkauf + einkaufartikel).
+#
+# Benötigt:
+# Tabellen artikel, artikellieferant, einkauf, einkaufartikel, lieferant.
+
 import random
 from datetime import datetime
 from db import get_conn
 
+# Hilfsfunktionen
 def fetch_low_stock(cur):
-    # товари з запасом < 1000
-    cur.execute("SELECT artikelID, produktname, lagerbestand FROM artikel WHERE lagerbestand < 3000;")
-    return cur.fetchall()  # [(artikelID, name, bestand), ...]
+    """
+    Sucht alle Artikel mit Lagerbestand < 3000.
+    Gibt zurück: [(artikelID, name, bestand), ...]
+    """
+    cur.execute("""
+        SELECT artikelID, produktname, lagerbestand
+        FROM artikel
+        WHERE lagerbestand < 3000;
+    """)
+    return cur.fetchall()
+
 
 def pick_random_supplier(cur, artikel_id):
-    # будь-який постачальник, що має цей товар у artikellieferant
+    """
+    Wählt einen zufälligen Lieferanten für einen Artikel.
+    Quelle: Tabelle artikellieferant.
+    Gibt zurück: (lieferantID, einkaufspreis) oder None.
+    """
     cur.execute("""
         SELECT lieferantID, einkaufspreis
         FROM artikellieferant
@@ -16,39 +38,53 @@ def pick_random_supplier(cur, artikel_id):
         ORDER BY RAND()
         LIMIT 1;
     """, (artikel_id,))
-    return cur.fetchone()  # (lieferantID, preis) або None
+    return cur.fetchone()
+
 
 def create_header(cur, lieferant_id):
-    # створюємо заголовок закупки
+    """
+    Erstellt einen neuen Einkauf (Kopfzeile in Tabelle 'einkauf').
+    Rechnung wird automatisch generiert (z. B. INV-12345).
+    Gibt zurück: einkaufID.
+    """
     cur.execute("""
         INSERT INTO einkauf (lieferantID, einkaufsdatum, rechnung, bemerkung)
-        VALUES (%s, NOW(), %s, 'Auto-Generated (smart)')
+        VALUES (%s, NOW(), %s, 'Auto-Generated (smart)');
     """, (lieferant_id, f"INV-{random.randint(10000, 99999)}"))
     return cur.lastrowid
 
+
 def add_item(cur, einkauf_id, artikel_id, menge, preis):
-    # додаємо позицію закупки
+    """
+    Fügt eine Position (Artikel) zum Einkauf hinzu.
+    """
     cur.execute("""
         INSERT INTO einkaufartikel (einkaufID, artikelID, einkaufsmenge, einkaufspreis)
-        VALUES (%s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s);
     """, (einkauf_id, artikel_id, menge, preis))
 
+
+
+# Hauptprogramm
 def main():
+    # Verbindung zur Datenbank herstellen
     conn = get_conn()
     if not conn:
-        print("Keine Verbindung zur Datenbank")
+        print("Keine Verbindung zur Datenbank.")
         return
 
     try:
         with conn.cursor() as cur:
+            # 1️ Artikel mit niedrigem Lagerbestand holen
             low = fetch_low_stock(cur)
             if not low:
-                print("Es gibt keine Produkte mit einem Lagerbestand von < 3000. Kein Kauf erforderlich.")
+                print(" Keine Artikel mit Lagerbestand < 3000. Kein Einkauf nötig.")
                 return
 
-            # згрупуємо товари за постачальником: {lieferantID: [(artikelID, menge, preis), ...]}
+            # 2️ Plan für Einkäufe vorbereiten
+            # Struktur: {lieferantID: [(artikelID, menge, preis), ...]}
             plan = {}
-            skipped = []
+            skipped = []  # Artikel ohne Lieferant
 
             for artikel_id, name, bestand in low:
                 sup = pick_random_supplier(cur, artikel_id)
@@ -56,13 +92,17 @@ def main():
                     skipped.append((artikel_id, name))
                     continue
                 lieferant_id, preis = sup
-                menge = random.randint(200, 4000)  # випадково 25-120
+
+                # zufällige Menge zwischen 200 und 4000 Stück
+                menge = random.randint(200, 4000)
+
                 plan.setdefault(lieferant_id, []).append((artikel_id, menge, preis))
 
             if not plan:
-                print("Für die benötigten Produkte sind keine Lieferanten verfügbar")
+                print("⚠Keine Lieferanten für die benötigten Artikel gefunden.")
                 return
 
+            # 3️ Einkäufe anlegen
             created = []
             for lieferant_id, items in plan.items():
                 einkauf_id = create_header(cur, lieferant_id)
@@ -70,18 +110,28 @@ def main():
                     add_item(cur, einkauf_id, artikel_id, menge, preis)
                 created.append((einkauf_id, lieferant_id, len(items)))
 
+        # 4️ Alles speichern (commit)
         conn.commit()
+
+        # 5️ Ergebnis anzeigen
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for eid, lid, n in created:
-            print(f"[{now}] Einkauf erstellt: einkaufID={eid}, Lieferant={lid}, menge={n}")
+            print(f"[{now}] ✅ Einkauf erstellt: einkaufID={eid}, Lieferant={lid}, Positionen={n}")
+
         if skipped:
-            print("Lieferant hat diesen Artikel nicht:",
+            print("❗ Kein Lieferant für folgende Artikel:",
                   ", ".join(f"{aid}" for aid, _ in skipped))
+
     except Exception as e:
+        # Wenn Fehler → zurückrollen
         conn.rollback()
         print(f"Fehler, Transaktion abgebrochen: {e}")
+
     finally:
+        # Verbindung schließen
         conn.close()
 
+
+# Wenn das Skript direkt gestartet wird
 if __name__ == "__main__":
     main()

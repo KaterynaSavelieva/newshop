@@ -1,10 +1,7 @@
 {# ───────────────────────────────────────────────
   reports_turnover.html
   Lagerumschlag-Analyse der letzten 90 Tage
-  - Filter (Umschlag / Lagerdauer / Lagerwert)
-  - Bubble-Chart (Umschlag vs. Lagerdauer, Blasengröße = Lagerwert)
-  - Balken-Chart (Top 15 nach Lagerwert)
-  - Tabelle mit klickbarer Sortierung
+  + Підсумки (таблиця tfoot + KPI-бейджі)
 ─────────────────────────────────────────────── #}
 
 {% extends "base.html" %}
@@ -12,45 +9,41 @@
 {% block content %}
 
 <style>
-  /*  Layout-Einstellungen */
   .chart-wrap { position: relative; width: 100%; max-width: 1100px; height: 420px; margin: 0 auto; }
-  .table thead th { cursor: pointer; }           /* Hand-Cursor → zeigt: man kann klicken (sortieren) */
-  .sticky-controls { position: sticky; top: 8px; z-index: 2; } /* Button bleibt sichtbar beim Scrollen */
+  .table thead th { cursor: pointer; }
+  .sticky-controls { position: sticky; top: 8px; z-index: 2; }
+  /* заголовки по центру */
+  #turnTable thead th { text-align: center; vertical-align: middle; }
+  /* індикатор сортування */
+  #turnTable thead th.sorted-asc::after  { content:" ↑"; font-weight:600; }
+  #turnTable thead th.sorted-desc::after { content:" ↓"; font-weight:600; }
 </style>
 
-<!--  Überschrift -->
 <h3 class="mb-3">Umschlag 90 Tage</h3>
 
 <div class="row g-3">
-  <!-- Linke Spalte: Filter-Karte -->
   <div class="col-lg-3">
     <div class="card">
       <div class="card-header py-2">Filter</div>
       <div class="card-body">
-        <!-- Eingabe: minimaler Umschlag (wie oft der Bestand "dreht") -->
         <div class="mb-3">
           <label class="form-label">Min. Umschlag</label>
           <input id="fUmsMin" type="number" step="0.1" class="form-control" value="0">
         </div>
-        <!-- Eingabe: maximale Lagerdauer (in Tagen) -->
         <div class="mb-3">
           <label class="form-label">Max. Lagerdauer (Tage)</label>
           <input id="fLagMax" type="number" step="1" class="form-control" value="9999">
         </div>
-        <!-- Eingabe: minimaler Lagerwert (in Euro) -->
         <div class="mb-3">
           <label class="form-label">Min. Lagerwert (€)</label>
           <input id="fLagWMin" type="number" step="0.01" class="form-control" value="0">
         </div>
-        <!-- Button: Filter anwenden -->
         <button id="btnApply" class="btn btn-primary w-100 sticky-controls">Filtern</button>
       </div>
     </div>
   </div>
 
-  <!-- Rechte Spalte: Diagramme -->
   <div class="col-lg-9">
-    <!-- Bubble: Umschlag vs. Lagerdauer (Blasengröße = Lagerwert) -->
     <div class="card mb-3">
       <div class="card-header py-2">Umschlag vs. Lagerdauer (Bubble = Lagerwert)</div>
       <div class="card-body">
@@ -58,7 +51,6 @@
       </div>
     </div>
 
-    <!-- Balken: Top 15 nach Lagerwert -->
     <div class="card mb-3">
       <div class="card-header py-2">Top 15 nach Lagerwert</div>
       <div class="card-body">
@@ -68,55 +60,72 @@
   </div>
 </div>
 
-<!-- Tabelle mit klickbarer Sortierung -->
 <div class="card">
   <div class="card-header py-2">Tabelle (klickbare Sortierung)</div>
   <div class="card-body table-responsive">
+
+    {# 🔹 KPI-бейджі (рахуються по відфільтрованих рядках) #}
+    <div id="kpiTotals" class="d-flex flex-wrap gap-2 mb-2 small">
+      <span class="badge bg-secondary">Zeilen: <span id="kpi_rows">0</span></span>
+      <span class="badge bg-secondary">Ø Umschlag: <span id="kpi_ums">0,00</span></span>
+      <span class="badge bg-secondary">Ø Lagerdauer: <span id="kpi_lag">0,00</span> T</span>
+      <span class="badge bg-secondary">∑ Lagerwert: € <span id="kpi_lw">0,00</span></span>
+      <span class="badge bg-secondary">∑ Bestand: <span id="kpi_best">0</span></span>
+    </div>
+
     <table id="turnTable" class="table table-sm table-striped table-bordered align-middle">
       <thead class="table-light">
         <tr>
-          {# data-col: Schlüssel im JS-Objekt → daran wird sortiert #}
           <th data-col="artikel">Artikel</th>
-          <th data-col="umschlag" class="text-end">Umschlag</th>
-          <th data-col="lagerdauer" class="text-end">Lagerdauer (T)</th>
-          <th data-col="lagerwert" class="text-end">Lagerwert (€)</th>
-          <th data-col="bestand" class="text-end">Bestand</th>
-          <th data-col="vk90" class="text-end">Verkauf 90d (Menge)</th>
-          <th data-col="cogs90" class="text-end">COGS 90d (€)</th>
-          <th data-col="dkost" class="text-end">DK (€)</th>
-          <th data-col="ek_min" class="text-end">EK min</th>
-          <th data-col="ek_max" class="text-end">EK max</th>
+          <th data-col="umschlag">Umschlag</th>
+          <th data-col="lagerdauer">Lagerdauer (T)</th>
+          <th data-col="lagerwert">Lagerwert (€)</th>
+          <th data-col="bestand">Bestand</th>
+          <th data-col="vk90">Verkauf 90d (Menge)</th>
+          <th data-col="cogs90">COGS 90d (€)</th>
+          <th data-col="dkost">DK (€)</th>
+          <th data-col="ek_min">EK min</th>
+          <th data-col="ek_max">EK max</th>
         </tr>
       </thead>
       <tbody></tbody>
+
+      {# 🔹 ПІДСУМКИ: середні/суми (оновлює JS) #}
+      <tfoot class="table-light">
+        <tr>
+          <th>Σ / Ø</th>
+          <th class="text-end" id="ft_umschlag_avg"></th>
+          <th class="text-end" id="ft_lagerdauer_avg"></th>
+          <th class="text-end" id="ft_lagerwert_sum"></th>
+          <th class="text-end" id="ft_bestand_sum"></th>
+          <th class="text-end" id="ft_vk90_sum"></th>
+          <th class="text-end" id="ft_cogs90_sum"></th>
+          <th class="text-end" id="ft_dkost_avg"></th>
+          <th class="text-end" id="ft_ek_min_avg"></th>
+          <th class="text-end" id="ft_ek_max_avg"></th>
+        </tr>
+      </tfoot>
     </table>
+
     <div class="text-muted small">Klick auf Spaltenkopf = sortieren (↑/↓).</div>
   </div>
 </div>
 
 <script>
-  //  Daten aus dem Backend (Python → JSON)
-  // rows_json wurde im View bereits als JSON erzeugt (Liste von Dicts)
+  // дані з бекенда
   const rows = {{ rows_json|safe }};
+  // форматування
+  const nf0 = new Intl.NumberFormat('de-AT',{maximumFractionDigits:0});
+  const nf2 = new Intl.NumberFormat('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtInt  = v => nf0.format(v ?? 0);
+  const fmt2    = v => nf2.format(v ?? 0);
+  const fmtEuro = v => nf2.format(v ?? 0);
 
-  //  Schöne Zahlenformatierung (de-AT):
-  // - nf0: ganze Zahlen (z. B. 12 345)
-  // - nf2: zwei Nachkommastellen (z. B. 1 234,56)
-  const nf0 = new Intl.NumberFormat('de-AT', { maximumFractionDigits: 0 });
-  const nf2 = new Intl.NumberFormat('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  //  kleine Helfer zum Formatieren im Table:
-  const fmtInt   = v => nf0.format(v ?? 0);
-  const fmt2     = v => nf2.format(v ?? 0);
-  const fmtEuro  = v => nf2.format(v ?? 0); // ohne "€" im Table (Header hat schon "€")
-
-  // =====  Filter anwenden =====
-  function applyFilters(data) {
+  // фільтри
+  function applyFilters(data){
     const minU  = parseFloat(document.getElementById('fUmsMin').value || 0);
     const maxL  = parseFloat(document.getElementById('fLagMax').value || 9999);
     const minLW = parseFloat(document.getElementById('fLagWMin').value || 0);
-
-    // Behalten nur Zeilen, die alle Bedingungen erfüllen
     return data.filter(d =>
       (d.umschlag ?? 0)   >= minU &&
       (d.lagerdauer ?? 0) <= maxL &&
@@ -124,55 +133,64 @@
     );
   }
 
-  // =====  Sortierung (Tabelle) =====
-  let sortCol = null;  // z. B. 'umschlag'
-  let sortDir = 1;     // 1 = aufsteigend, -1 = absteigend
-
-  function sortData(data) {
-    if (!sortCol) return data;
-    return [...data].sort((a, b) => {
-      const va = a[sortCol];
-      const vb = b[sortCol];
-      // Strings alphabetisch, Zahlen numerisch
-      if (typeof va === 'string' || typeof vb === 'string') {
-        return String(va ?? '').localeCompare(String(vb ?? ''), 'de') * sortDir;
+  // сортування
+  let sortCol=null, sortDir=1;
+  function sortData(data){
+    if(!sortCol) return data;
+    return [...data].sort((a,b)=>{
+      const va=a[sortCol], vb=b[sortCol];
+      if(typeof va==='string' || typeof vb==='string'){
+        return String(va??'').localeCompare(String(vb??''),'de')*sortDir;
       }
-      return ((va ?? 0) - (vb ?? 0)) * sortDir;
+      return ((va??0)-(vb??0))*sortDir;
     });
   }
-
-  function attachSorting() {
-    // Klick auf Tabellenkopf startet Sortierung nach der Spalte
-    document.querySelectorAll('#turnTable thead th').forEach(th => {
-      th.addEventListener('click', () => {
-        const col = th.dataset.col;
-        if (!col) return;
-        if (sortCol === col) {
-          sortDir *= -1;  // Richtung umdrehen (↑↔↓)
-        } else {
-          sortCol = col;
-          sortDir = 1;    // neu: start mit aufsteigend
-        }
+  function attachSorting(){
+    document.querySelectorAll('#turnTable thead th').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const col=th.dataset.col; if(!col) return;
+        if(sortCol===col){ sortDir*=-1; } else { sortCol=col; sortDir=1; }
         renderAll();
-
-        // Visuelle Pfeile aktualisieren
-        document.querySelectorAll('#turnTable thead th').forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
-        th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+        document.querySelectorAll('#turnTable thead th').forEach(h=>h.classList.remove('sorted-asc','sorted-desc'));
+        th.classList.add(sortDir===1?'sorted-asc':'sorted-desc');
       });
     });
   }
 
-  // =====  Render-Funktionen für Tabelle und Charts =====
-  let scChart, barChart;  // Chart-Instanzen (zum Zerstören vor Neuaufbau)
+  // charts
+  let scChart, barChart;
 
-  function renderAll() {
-    // 1) Filter + Sortierung anwenden
+  // ⬇️ Хелпери для підсумків
+  const sum = (arr, key) => arr.reduce((a,x)=>a + (parseFloat(x[key])||0), 0);
+  const avg = (arr, key) => arr.length ? (sum(arr,key)/arr.length) : 0;
+
+  function renderTotals(data){
+    // KPI бейджі
+    document.getElementById('kpi_rows').textContent = fmtInt(data.length);
+    document.getElementById('kpi_ums').textContent  = fmt2(avg(data,'umschlag'));
+    document.getElementById('kpi_lag').textContent  = fmt2(avg(data,'lagerdauer'));
+    document.getElementById('kpi_lw').textContent   = fmtEuro(sum(data,'lagerwert'));
+    document.getElementById('kpi_best').textContent = fmtInt(sum(data,'bestand'));
+
+    // футер таблиці
+    document.getElementById('ft_umschlag_avg').textContent   = fmt2(avg(data,'umschlag'));
+    document.getElementById('ft_lagerdauer_avg').textContent = fmt2(avg(data,'lagerdauer'));
+    document.getElementById('ft_lagerwert_sum').textContent  = fmtEuro(sum(data,'lagerwert'));
+    document.getElementById('ft_bestand_sum').textContent    = fmtInt(sum(data,'bestand'));
+    document.getElementById('ft_vk90_sum').textContent       = fmt2(sum(data,'vk90'));
+    document.getElementById('ft_cogs90_sum').textContent     = fmtEuro(sum(data,'cogs90'));
+    document.getElementById('ft_dkost_avg').textContent      = fmtEuro(avg(data,'dkost'));
+    document.getElementById('ft_ek_min_avg').textContent     = fmtEuro(avg(data,'ek_min'));
+    document.getElementById('ft_ek_max_avg').textContent     = fmtEuro(avg(data,'ek_max'));
+  }
+
+  function renderAll(){
     const filtered = applyFilters(rows);
     const data = sortData(filtered);
 
-    // 2) Tabelle bauen (mit schöner Formatierung)
+    // таблиця
     const tbody = document.querySelector('#turnTable tbody');
-    tbody.innerHTML = data.map(d => `
+    tbody.innerHTML = data.map(d=>`
       <tr>
         <td>${d.artikel}</td>
         <td class="text-end">${fmt2(d.umschlag)}</td>
@@ -187,95 +205,50 @@
       </tr>
     `).join('');
 
-    // 3) Bubble-Chart: Umschlag (x) vs Lagerdauer (y) — Radius = Lagerwert
-    const minLW = Math.min(...data.map(d => d.lagerwert ?? 0), 0);
-    const maxLW = Math.max(...data.map(d => d.lagerwert ?? 0), 1);
-    const rMin = 4, rMax = 18;
+    // підсумки
+    renderTotals(data);
+
+    // bubble
+    const minLW = Math.min(...data.map(d=>d.lagerwert ?? 0), 0);
+    const maxLW = Math.max(...data.map(d=>d.lagerwert ?? 0), 1);
+    const rMin=4, rMax=18;
     const rScale = v => {
-      const t = ( (v ?? 0) - minLW ) / ( (maxLW - minLW) || 1 );
-      return rMin + t * (rMax - rMin);
+      const t = (((v??0)-minLW)/((maxLW-minLW)||1));
+      return rMin + t*(rMax-rMin);
     };
+    const bubbleDS = data.map(d=>({x:d.umschlag??0, y:d.lagerdauer??0, r:rScale(d.lagerwert), _label:d.artikel, _lw:d.lagerwert??0}));
 
-    const bubbleDS = data.map(d => ({
-      x: d.umschlag ?? 0,
-      y: d.lagerdauer ?? 0,
-      r: rScale(d.lagerwert),
-      _label: d.artikel,
-      _lw: d.lagerwert ?? 0
-    }));
-
-    // Vorhandenes Chart zerstören → neu zeichnen (sonst Doppel-Canvas)
-    if (scChart) scChart.destroy();
-    scChart = new Chart(document.getElementById('scatterChart'), {
-      type: 'bubble',
-      data: { datasets: [{ data: bubbleDS }] },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              // Schöne Tooltip-Zeilen mit Einheiten und "€"
-              label: (ctx) => {
-                const p = ctx.raw;
-                return [
-                  p._label,
-                  `Umschlag: ${fmt2(p.x)}`,
-                  `Lagerdauer: ${fmt2(p.y)} T`,
-                  `Lagerwert: € ${fmtEuro(p._lw)}`
-                ];
-              }
-            }
-          }
-        },
-        scales: {
-          x: { title: { display: true, text: 'Umschlag (90T)' }, beginAtZero: true },
-          y: { title: { display: true, text: 'Lagerdauer (Tage)' }, beginAtZero: true }
-        }
+    if(scChart) scChart.destroy();
+    scChart = new Chart(document.getElementById('scatterChart'),{
+      type:'bubble',
+      data:{datasets:[{data:bubbleDS}]},
+      options:{
+        responsive:true,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=> {
+          const p=ctx.raw;
+          return [p._label, `Umschlag: ${fmt2(p.x)}`, `Lagerdauer: ${fmt2(p.y)} T`, `Lagerwert: € ${fmtEuro(p._lw)}`];
+        }}}},
+        scales:{x:{title:{display:true,text:'Umschlag (90T)'},beginAtZero:true},
+                y:{title:{display:true,text:'Lagerdauer (Tage)'},beginAtZero:true}}
       }
     });
 
-    // 4) Balken-Chart: Top-15 nach Lagerwert
-    const top = [...data].sort((a,b)=> (b.lagerwert ?? 0) - (a.lagerwert ?? 0)).slice(0,15);
-    if (barChart) barChart.destroy();
-    barChart = new Chart(document.getElementById('barChart'), {
-      type: 'bar',
-      data: {
-        labels: top.map(d => d.artikel),
-        datasets: [{ label: 'Lagerwert (€)', data: top.map(d => d.lagerwert ?? 0) }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display:false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => `€ ${fmtEuro(ctx.parsed.y)}`
-            }
-          }
-        },
-        scales: { y: { beginAtZero: true, title: { display: true, text: '€' } } }
+    // bar top-15
+    const top = [...data].sort((a,b)=>(b.lagerwert??0)-(a.lagerwert??0)).slice(0,15);
+    if(barChart) barChart.destroy();
+    barChart = new Chart(document.getElementById('barChart'),{
+      type:'bar',
+      data:{ labels: top.map(d=>d.artikel),
+             datasets:[{label:'Lagerwert (€)', data: top.map(d=>d.lagerwert??0)}]},
+      options:{ responsive:true,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>`€ ${fmtEuro(ctx.parsed.y)}`}}},
+        scales:{y:{beginAtZero:true, title:{display:true,text:'€'}}}
       }
     });
   }
 
-  // Initialisieren: nach Laden der Seite
-  document.addEventListener('DOMContentLoaded', () => {
-    attachSorting();     // Klickbare Sortierung aktivieren
-    renderAll();         // Erstes Rendern (Standard-Filter)
-  });
-
-  // Filter-Button: wendet aktuelle Werte an (ohne Seiten-Reload)
-  document.getElementById('btnApply').addEventListener('click', e => {
-    e.preventDefault();
-    renderAll();
-  });
+  document.addEventListener('DOMContentLoaded', ()=>{ attachSorting(); renderAll(); });
+  document.getElementById('btnApply').addEventListener('click', e=>{ e.preventDefault(); renderAll(); });
 </script>
-
-<style>
-  /*  optischer Sortier-Indikator an Kopfzeile */
-  #turnTable thead th.sorted-asc::after  { content:" ↑"; font-weight:600; }
-  #turnTable thead th.sorted-desc::after { content:" ↓"; font-weight:600; }
-</style>
 
 {% endblock %}
