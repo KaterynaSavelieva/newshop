@@ -116,6 +116,20 @@
         <td>{{ '%.2f'|format(r[6]) }}</td>
         <td>{{ '%.2f'|format(r[7]) }}</td>
       </tr>
+
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ r[1] }}</td>
+                <td class="text-end">{{ r[2] | thousands(0) }}</td>
+                <td class="text-end">{{ r[3] | thousands(0) }}</td>
+                <td class="text-end">{{ r[4] | thousands }}</td>
+                <td class="text-end">{{ r[5] | thousands }}</td>
+                <td class="text-end">{{ r[6] | thousands }}</td>
+                <td class="text-end">{{ r[7] | thousands(2) }} %</td>
+            </tr>
+
+
+
       {% endfor %}
     </tbody>
     <tfoot class="table-light">

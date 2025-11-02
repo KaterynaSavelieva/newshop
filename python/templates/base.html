@@ -18,58 +18,66 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <!-- kleines Symbol (Icon) für die Browser-Registerkarte, optional -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    
+    <!-- Іконка PNG (сучасні браузери) -->
+    <link rel="icon" type="image/png"
+      href="{{ url_for('static', filename='favicon.png') }}"
+      sizes="32x32">
+
+<!-- Фолбек для браузерів, що шукають тільки .ico -->
+    <link rel="shortcut icon"
+      href="{{ url_for('static', filename='favicon.ico') }}">
 
     <!-- Eigene Farben und Stil (CSS) für das ganze Projekt -->
     <style>
-        /* 🎨 Allgemeines Design der Seite */
+        /* Allgemeines Design der Seite */
         body {
             background: #f8f9fb;   /* hellgrauer Hintergrund für eine ruhige Optik */
             font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             /* obige Zeile bestimmt den Schriftstil – moderne, gut lesbare Schrift */
         }
 
-        /* 🔹 obere Menüleiste (Navigation) */
+        /* obere Menüleiste (Navigation) */
         .navbar {
             background: #ffffff; /* weißer Hintergrund */
             border-bottom: 1px solid #e9ecef; /* dünne graue Linie unten */
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04); /* leichter Schatten unten */
         }
 
-        /* 🔹 legt die maximale Breite des Inhalts fest */
+        /* legt die maximale Breite des Inhalts fest */
         .container { max-width: 1280px; }
 
-        /* 🔹 Boxen (Bootstrap-Komponente "Card") */
+        /* Boxen (Bootstrap-Komponente "Card") */
         .card {
             border-radius: 14px;   /* abgerundete Ecken für weiches Aussehen */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03); /* feiner Schatten */
         }
 
-        /* 🔹 Tabellenkopf – Bereich mit Spaltenüberschriften */
+        /* Tabellenkopf – Bereich mit Spaltenüberschriften */
         .table thead th {
             white-space: nowrap; /* Text bleibt in einer Zeile (kein Zeilenumbruch) */
             background-color: #f1f3f5; /* leicht grauer Hintergrund */
         }
 
-        /* 🔹 Tabellenzeilen beim Darüberfahren mit der Maus */
+        /* Tabellenzeilen beim Darüberfahren mit der Maus */
         .table-hover tbody tr:hover {
             background-color: #f8f9fa; /* leicht hellere Farbe */
         }
 
-        /* 🔹 Stil des blauen Haupt-Buttons (Bootstrap-Klasse "btn-primary") */
+        /* Stil des blauen Haupt-Buttons (Bootstrap-Klasse "btn-primary") */
         .btn-primary {
             background-color: #0069d9; /* mittleres Blau */
             border-color: #0062cc;     /* leicht dunklere Umrandung */
         }
 
-        /* 🔹 Markierung für den aktiven Menüpunkt (zeigt, wo man gerade ist) */
+        /* Markierung für den aktiven Menüpunkt (zeigt, wo man gerade ist) */
         .nav-link.active {
             font-weight: 600; /* etwas fetterer Text */
             color: #0d6efd !important; /* kräftiges Blau */
             border-bottom: 2px solid #0d6efd; /* blaue Linie unter dem aktiven Punkt */
         }
 
-        /* 🔹 Fußzeile (unten auf der Seite) */
+        /* Fußzeile (unten auf der Seite) */
         footer {
             color: #6c757d;        /* grauer Text */
             background: #f8f9fa;   /* heller Hintergrund */
@@ -79,7 +87,7 @@
 </head>
 
 <body>
-    <!-- 🔝 OBERE NAVIGATION -->
+    <!-- OBERE NAVIGATION -->
     <!-- "sticky-top" bedeutet: die Leiste bleibt oben, wenn man scrollt -->
     <nav class="navbar navbar-expand-lg sticky-top">
       <div class="container">
@@ -156,7 +164,7 @@
       </div>
     </nav>
 
-    <!-- 🧱 HAUPTBEREICH DER SEITE -->
+    <!--  HAUPTBEREICH DER SEITE -->
     <main class="container py-4">
         <!-- Flash-Nachrichten (z. B. "Gespeichert", "Fehler", "Erfolgreich abgemeldet") -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -177,7 +185,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- 👣 FUSSZEILE (unten auf jeder Seite) -->
+    <!--  FUSSZEILE (unten auf jeder Seite) -->
     <footer class="text-center text-muted py-3 small">
         © NewShop – Demo Dashboard
     </footer>
