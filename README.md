@@ -1,139 +1,145 @@
-## 🛍️ **NewShop – Verkaufsanalyse mit Raspberry Pi**
+# 🛍️ **NewShop – Verkaufsanalyse mit Raspberry Pi**
 
-Ziel des Projekts ist es zu zeigen, wie ein kleiner Daten-Server auf Basis eines **Raspberry Pi**  
-vollständig den Datenprozess eines Shops abbilden kann – von der Datenerzeugung bis zur Analyse.
 
----
+### Ziel des Projekts
 
-## 🎯 **Projektziel**
-
-Der Raspberry Pi fungiert als Mini-Server, der automatisch Verkaufs- und Einkaufsdaten generiert,  
-in einer **MySQL-Datenbank** speichert und Analysen über ein **Flask-basiertes Web-Dashboard** anzeigt.  
-So lässt sich der komplette Datenprozess in einem kleinen Unternehmen simulieren:
-
-> **Datenfluss:**  
-> Daten-Generierung → Speicherung in MySQL → Analyse → Visualisierung im Web-Dashboard
+Dieses Projekt zeigt, wie ein kleiner **Raspberry Pi** als **Mini-Datenserver** für den Einzelhandel dienen kann.  
+Der Pi generiert Verkaufsdaten automatisch, speichert sie in einer **MySQL-Datenbank**  
+und stellt interaktive **Analysen im Web-Dashboard (Flask + Chart.js)** dar.
 
 ---
 
-## ⚙️ **Systemübersicht**
+## ⚙️ Systemübersicht
 
 | Komponente | Beschreibung |
 |-------------|---------------|
-| 🐍 **Python-Skripte** | Generierung von Verkäufen (`sale.py`), Einkäufen (`purchase.py`) und historischer Daten (`generate_history.py`) |
-| 🧮 **MySQL-Datenbank** | Tabellen wie `kunden`, `lieferanten`, `artikel`, `verkauf`, `einkauf` usw. |
-| 🌐 **Flask-Web-App** | Dashboard mit Analysen (Umsatz, Pareto 80/20, Lagerwarnung, Umschlag etc.) |
-| 🍓 **Raspberry Pi 5** | Host-System mit MySQL-Server und Python-Umgebung |
-| 📊 **Chart.js + Bootstrap 5** | Visualisierung und modernes UI im Browser |
+| **Datenbank (MySQL)** | Tabellen: `kunden`, `artikel`, `lieferanten`, `verkauf`, `verkauf_artikel` |
+| **Python-Module** | Datengenerierung (`generate_history.py`, `sale.py`, `purchase.py`) + Web-Frontend |
+| **Flask Dashboard** | Visualisierung der Daten (Umsatz, Marge, Lagerbestand usw.) |
+| **Raspberry Pi 5** | Host-System mit MySQL-Server und Python-Umgebung |
+| **Chart.js** | Visualisierung und Diagramme im Browser |
 
 ---
 
-## 🗂️ **Projektstruktur**
-```
+## 📂 Projektstruktur
+
+```plaintext
 newshop/
 ├── python/
-│ ├── db.py # Verbindung zur MySQL-Datenbank
-│ ├── generators/
-│ │ ├── sale.py # tägliche Generierung von Verkäufen
-│ │ ├── purchase.py # automatische Nachbestellungen
-│ │ └── generate_history.py # Erzeugt komplette historische Daten 2024–2025
-│ ├── dashboard/
-│ │ ├── routes.py # Flask-Routen
-│ │ └── templates/ # HTML-Vorlagen (base.html, pareto.html, etc.)
-│ └── ...
-├── sql/
-│ ├── schema.sql # Tabellen-Definitionen
-│ ├── triggers.sql # Datenbank-Trigger (für reale Nutzung)
-│ └── views.sql # Analyse-Views
-├── .env # Verbindungsdaten (DB_HOST, DB_USER, DB_PASSWORD)
-├── app.py # Flask-Startpunkt
-└── README.md
+│   ├── auth/              → Login-System
+│   ├── generators/        → Datengenerierung & Simulation (Verkauf, Einkauf, Lager)
+│   │   ├── generate_history.py
+│   │   ├── sale.py
+│   │   └── purchase.py
+│   ├── reports/           → Alle Analyseberichte (Umsatz, Pareto, Lager, u.a.)
+│   │   ├── routes.py
+│   │   ├── service.py
+│   │   └── templates/
+│   ├── dashboard.py       → Haupt-App (Flask)
+│   └── db.py              → Verbindung zu MySQL
+│
+├── sql/                   → SQL-Dateien für Tabellen, Views, Trigger
+│   ├── create_tables.sql
+│   ├── v_sales.sql
+│   ├── v_sales_by_day.sql
+│   ├── v_sales_by_customer.sql
+│   └── v_umschlag_90tage.sql
+│
+├── .env                   → Umgebungsvariablen (DB_USER, DB_PASSWORD, DB_HOST)
+├── ER.drawio              → Datenmodell (ER-Diagramm)
+├── README.md
+└── notes.md
 ```
-
 ---
+
 
 ## 🚀 **Installation & Start**
 
-### 1️. Voraussetzungen
+### Voraussetzungen
 - Raspberry Pi 4 oder 5 mit **Raspberry Pi OS**
 - **Python 3.11+**
 - **MySQL 8.x**
 - Virtuelle Umgebung `.venv` (optional)
 
-### 2️. Setup der Umgebung
+### 1. Setup der Umgebung
 
 ```bash
 git clone https://github.com/KaterynaSavelieva/newshopdb.git
 cd newshopdb
 python -m venv .venv
-source .venv/bin/activate   # oder: .venv\Scripts\activate
+source .venv/bin/activate  
 pip install -r requirements.txt
 ```
 
-### 3️. MySQL-Datenbank vorbereiten
+### 2. MySQL-Datenbank erstellen
 
 ```
-mysql -u root -p
-CREATE DATABASE newshopdb;
+CREATE DATABASE newshopdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE newshopdb;
-SOURCE sql/schema.sql;
-SOURCE sql/views.sql;
--- Trigger nur im Produktionsmodus aktivieren:
--- SOURCE sql/triggers.sql;
+SOURCE sql/create_tables.sql;
+SOURCE sql/data.sql;
+SOURCE sql/v_sales.sql;
+SOURCE sql/v_sales_by_day.sql;
+SOURCE sql/v_sales_by_customer.sql;
+SOURCE sql/v_umschlag_90tage.sql;
 ```
 
-### 4️. Generierung historischer Daten
+### 3. Historische Daten generieren
 
 > ⚠️ Trigger sollten dabei deaktiviert sein, da der Python-Code Lagerbestand und Durchschnittskosten selbst aktualisiert.
 
 ```python -m python.generators.generate_history```
+Dadurch werden Lagerstände und Durchschnittskosten automatisch berechnet
+und Verkaufsdaten für mehrere Monate erzeugt.
 
 
-Erzeugt:
-
-- Einkäufe (01.01.–03.01.2024)
-- Verkäufe (04.01.2024–30.10.2025)
-- Automatische Nachbestellungen bei Bedarf
-
-### 5️. Web-Dashboard starten
-```flask --app python.dashboard.routes run --host=0.0.0.0 --port=5000```
+### 4. Web-Dashboard starten
+```python dashboard.py```
 
 Dann im Browser öffnen:
-👉 ```http://<Raspberry-IP>:5000```
 
-### 📈 Analyse-Berichte im Dashboard
+```http://localhost:5000```
+
+oder (bei Raspberry Pi im Netzwerk):
+
+```http://<Raspberry-IP>:5000```
+
+
+### 📈 Analyseberichte im Dashboard
 
 | Bericht | Beschreibung |
 |-------------|---------------|
 | Dashboard | Übersicht aller Verkäufe |
-| Umsatz pro Tag | Tagesumsätze als Diagramm|
-| Umsatz pro Kunde | Artikel	Ranking der besten Kunden und Artikel |
-| Pareto 80/20| Umsatzverteilung (80 % Umsatz durch 20 % Kunden/Artikel) |
+| Umsatz pro Tag | Tagesstatistik der Verkäuf|
+| Umsatz pro Kunde | Top Kunden, Umsatz & Marge |
+| Umsatz pro Artikel | tikelanalyse mit Filter & Zeitreihen |
 | Lagerwarnung | Artikel mit niedrigem Bestand |
-| Umschlag 90 Tage | Lagerumschlag in den letzten 90 Tagenr | 	
+| Pareto 80/20| Umsatz- oder Marge-Verteilung (nach Artikel, Kunde, Kundentyp) |
+| Umschlag 90 Tage | Lagerumschlag und durchschnittliche Lagerdauer | 	
+
 
     
-### 🧠 Lernziele / Fokus
-   - Praxisorientierte Anwendung von SQL, Python, Flask, Bootstrap, Chart.js
-   - Datenbank-Design und Trigger-Logik
-   - Datenanalyse und Visualisierung auf Raspberry Pi
-   - Automatisierung von Verkaufs-/Einkaufsprozessen
-   - Projektarbeit im Rahmen einer Weiterbildung zur Data Analystin
+### 🎯 Lernziele / Fokus
+   - Datenbankmodellierung (MySQL, Views, Trigger, Constraints)
+   - Python-Programmierung (Datenanalyse, Simulation, Flask)
+   - Chart.js-Visualisierung & Responsive Webdesign
+   - Filtern, Aggregieren & Darstellen betrieblicher Kennzahlen (Umsatz, Marge, Lager)
+   - Einsatz von Raspberry Pi als lokaler Datenserver
+   - Präsentation vollständiger Datenprozesskette (Daten → Analyse → Visualisierung)
 
 ### 👩‍💻 Autorin
 
-Kateryna Savelieva
+**Kateryna Savelieva**
 
 📍 Zeltweg, Österreich
 
-🎓 Teilnehmerin am SZF (Murau / Murtal)
+🎓 Weiterbildung im SZF  – Fachbereich IT
 
 💡 Ziel: Berufseinstieg als Data Analystin
 
 
-### 📅 Zeitraum
-Projektzeitraum: September-Oktober 2025
 
-Letzte Aktualisierung: Oktober 2025
+📅 Projektzeitraum: September – November 2025
 
+🕓 Letzte Aktualisierung: November 2025
 
