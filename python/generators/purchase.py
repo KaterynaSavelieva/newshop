@@ -20,7 +20,7 @@ def fetch_low_stock(cur):
     cur.execute("""
         SELECT artikelID, produktname, lagerbestand
         FROM artikel
-        WHERE lagerbestand < 3000;
+        WHERE lagerbestand < 4000;
     """)
     return cur.fetchall()
 
