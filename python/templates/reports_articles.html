@@ -166,7 +166,7 @@
             <tr>
                 <td>{{ loop.index }}</td>
                 <td>
-                  <a href="{{ url_for('reports.report_customers') }}?artikel={{ r[1] | urlencode }}"
+                  <a href="{{ url_for('reports.report_customers') }}?artikelID={{ r[0] }}"
                      class="text-decoration-none">
                      {{ r[1] }}
                   </a>

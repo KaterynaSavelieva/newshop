@@ -152,7 +152,7 @@ def report_customers():
     von, bis = f_get_period(30)
 
     # Wenn der Benutzer aus "Umsatz pro Artikel" kommt:
-    artikel_param = request.args.get("artikel")
+    artikel_param = request.args.get("artikelID")
     if artikel_param:
         # Filter für diesen Artikel aktivieren
         artikel_sel = [artikel_param]
