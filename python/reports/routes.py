@@ -154,11 +154,9 @@ def report_customers():
     # Wenn der Benutzer aus "Umsatz pro Artikel" kommt:
     artikel_param = request.args.get("artikelID")
     if artikel_param:
-        # Filter für diesen Artikel aktivieren
-        artikel_sel = [artikel_param]
+        artikel_sel = [artikel_param]  # Filter aktivieren
     else:
-        artikel_sel = []
-
+        _, artikel_sel, _ = f_get_filters()
 
     # Filter-IDs (Mehrfachauswahl)
     kunden_sel, artikel_sel, kundentyp_sel = f_get_filters()
