@@ -110,39 +110,25 @@
         <td>{{ loop.index }}</td>
         <td>{{ r[1] }}</td>
         <td>{{ r[2] }}</td>
-        <td>{{ '%.0f'|format(r[3]) }}</td>
-        <td>{{ '%.2f'|format(r[4]) }}</td>
-        <td>{{ '%.2f'|format(r[5]) }}</td>
-        <td>{{ '%.2f'|format(r[6]) }}</td>
-        <td>{{ '%.2f'|format(r[7]) }}</td>
-      </tr>
-
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ r[1] }}</td>
-                <td class="text-end">{{ r[2] | thousands(0) }}</td>
-                <td class="text-end">{{ r[3] | thousands(0) }}</td>
-                <td class="text-end">{{ r[4] | thousands }}</td>
-                <td class="text-end">{{ r[5] | thousands }}</td>
-                <td class="text-end">{{ r[6] | thousands }}</td>
-                <td class="text-end">{{ r[7] | thousands(2) }} %</td>
-            </tr>
-
-
-
+        <td class="text-end">{{ r[3] | thousands(0) }}</td>
+        <td class="text-end">{{ r[4] | thousands }}</td>
+        <td class="text-end">{{ r[5] | thousands }}</td>
+        <td class="text-end">{{ r[6] | thousands }}</td>
+        <td class="text-end">{{ r[7] | thousands(2) }} %</td>
       {% endfor %}
     </tbody>
+
     <tfoot class="table-light">
       <tr>
         <th colspan="2">Summe</th>
-        <th>{{ totals.positionen }}</th>
-        <th>{{ '%.0f'|format(totals.menge) }}</th>
-        <th>{{ '%.2f'|format(totals.umsatz) }}</th>
-        <th>{{ '%.2f'|format(totals.kosten) }}</th>
-        <th>{{ '%.2f'|format(totals.marge) }}</th>
-        <th>
-          {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
-          {{ '%.2f'|format(marge_pct_total) }}
+        <th class="text-end">{{ totals.positionen | thousands(0) }}</th>
+        <th class="text-end">{{ totals.menge | thousands(0) }}</th>
+        <th class="text-end">{{ totals.umsatz | thousands }}</th>
+        <th class="text-end">{{ totals.kosten | thousands }}</th>
+        <th class="text-end">{{ totals.marge  | thousands }}</th>
+        <th class="text-end">
+            {% set marge_pct_total = (100.0 * totals.marge / (totals.umsatz if totals.umsatz != 0 else 1.0)) %}
+           {{ marge_pct_total | thousands(2) }} %
         </th>
       </tr>
     </tfoot>
