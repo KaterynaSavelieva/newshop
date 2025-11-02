@@ -11,7 +11,7 @@ from .service import (
     f_get_period,     # liest von/bis aus URL oder nimmt Standard (z. B. letzte 30 Tage)
     f_get_filters     # liest Listen von ausgewählten IDs (kunden, artikel, kundentypen)
 )
-
+import re
 
 #  Blueprint für alle Report-Seiten (alle URLs beginnen mit /reports/)
 # Ein Blueprint ist wie ein "Mini-App-Modul": wir sammeln thematisch passende
@@ -196,12 +196,19 @@ def report_customers():
             # WHERE und Parameter
             where_sql, params = f_build_where_sql(von, bis, kunden_sel, kundentyp_sel, artikel_sel)
 
-            where_sql = (where_sql
-                         .replace("verkaufsdatum", "vs.verkaufsdatum")
-                         .replace("kundenID", "vs.kundenID")  # фільтр за клієнтами беремо з vs
-                         .replace("artikelID", "vs.artikelID")  # фільтр за товарами – теж з vs
-                         .replace("kundentypID", "k.kundentypID")  # тип клієнта – з таблиці kunden
-                         )
+            # Надійно префіксуємо всі колонки (з або без бектіків)
+            alias_map = {
+                "verkaufsdatum": "vs.verkaufsdatum",  # з v_sales
+                "kundenID": "vs.kundenID",  # з v_sales
+                "artikelID": "vs.artikelID",  # з v_sales
+                "kundentypID": "k.kundentypID",  # з таблиці kunden
+            }
+
+            for col, aliased in alias_map.items():
+                # (?<!\w) і (?!\w) — щоб не чіпати схожі підрядки
+                # `? ... `? — опційні бектіки
+                pattern = rf'(?<!\w)`?{col}`?(?!\w)'
+                where_sql = re.sub(pattern, aliased, where_sql)
 
             # Aggregation pro Kunde (absteigend nach Umsatz)
             sql = f"""
