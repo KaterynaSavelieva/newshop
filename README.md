@@ -1,12 +1,47 @@
-# 🛍️ **NewShop – Verkaufsanalyse mit Raspberry Pi**
+# 📊 NewShop – Sales Analytics System (Raspberry Pi + MySQL + Flask)
 
+NewShop is a data analytics system designed to simulate a real retail environment.
 
-### Ziel des Projekts
+The project demonstrates how sales data can be generated, stored, processed, and visualized using a full data pipeline — from raw data to business insights.
 
-Dieses Projekt zeigt, wie ein kleiner **Raspberry Pi** als **Mini-Datenserver** für den Einzelhandel dienen kann.  
-Der Pi generiert Verkaufsdaten automatisch, speichert sie in einer **MySQL-Datenbank**  
-und stellt interaktive **Analysen im Web-Dashboard (Flask + Chart.js)** dar.
+💡 The system runs on a Raspberry Pi, acting as a lightweight data server.
 
+---
+
+## 🚀 What I built
+
+In this project, I implemented:
+
+- a data generation system simulating real sales (purchases, sales, stock)
+- a MySQL database with structured business data
+- SQL views for analytical queries (sales, customers, products)
+- a Flask-based dashboard for data visualization
+- automated data processing scripts
+- integration of Python + SQL + web visualization
+
+---
+
+## 📈 Business value
+
+The system provides insights such as:
+
+- daily sales performance
+- top customers and products
+- profit and margin analysis
+- inventory status and stock alerts
+- Pareto (80/20) analysis
+- stock turnover metrics
+
+---
+
+## 🧠 What I learned
+
+- building end-to-end data pipelines
+- working with SQL (views, aggregation, analysis)
+- designing data models for business scenarios
+- connecting backend data with frontend dashboards
+- simulating realistic datasets
+- deploying a system on Raspberry Pi
 ---
 
 ## ⚙️ Systemübersicht
